@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL 3D Engine - Boilerplate</title>
+    <!-- Importar fontes modernas do Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Canvas WebGL Principal -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Overlay de Efeito de Vinheta Cinemática -->
+    <div class="vignette"></div>
+
+    <!-- Interface HUD do Desenvolvedor -->
+    <div class="hud-container">
+        
+        <!-- Painel de Estatísticas em Tempo Real -->
+        <div class="hud-bar-container dev-stats">
+            <div class="hud-label">ESTATÍSTICAS DA CÂMERA</div>
+            <div class="stat-row">Posição: <span id="statPos">[0.00, 1.80, 6.50]</span></div>
+            <div class="stat-row">Yaw / Pitch: <span id="statRot">-90.0° / 0.0°</span></div>
+            <div class="stat-row">FPS Estimado: <span id="statFPS">60</span></div>
+            <div class="stat-row">Luz Ativa: <span id="statLight">Pêndulo (Verde)</span></div>
+        </div>
+
+        <!-- Painel de Título -->
+        <div class="hud-header">
+            <h1 class="game-title">3D ENGINE</h1>
+            <div class="game-subtitle">BOILERPLATE WEBGL PURE</div>
+        </div>
+
+        <!-- Painel de Instruções e Código (Glassmorphic) -->
+        <div class="control-panel" id="controlPanel">
+            <h3 class="panel-title">PAINEL DE FERRAMENTAS</h3>
+            <p class="panel-desc">Estrutura base pronta para criação do seu próprio jogo. Insira seus shaders e geometrias no loop principal.</p>
+            
+            <div class="controls-guide">
+                <div class="control-row">
+                    <span class="key">W</span>
+                    <span class="key">A</span>
+                    <span class="key">S</span>
+                    <span class="key">D</span>
+                    <span class="control-desc">Movimentação WASD</span>
+                </div>
+                <div class="control-row">
+                    <span class="mouse-icon">🖱️</span>
+                    <span class="control-desc">Olhar 360° (Clique para travar)</span>
+                </div>
+                <div class="control-row">
+                    <span class="key" id="lightToggle">L</span>
+                    <span class="control-desc">Alternar Luz (Pêndulo / Câmera)</span>
+                </div>
+            </div>
+
+            <div class="pointer-status" id="pointerStatus">
+                Clique na tela para capturar o mouse (Pointer Lock)
+            </div>
+
+            <div class="panel-footer">
+                Altere <code>game.js</code> para customizar a cena
+            </div>
+        </div>
+    </div>
+
+    <!-- Mensagem de Carregamento Inicial -->
+    <div class="loader-overlay" id="loaderOverlay">
+        <div class="loader-content">
+            <h2 class="loader-title">INICIALIZANDO MOTOR 3D...</h2>
+            <div class="loader-spinner"></div>
+            <p class="loader-text" id="loaderText">Carregando bibliotecas matemáticas e shaders...</p>
+        </div>
+    </div>
+
+    <!-- Scripts de Biblioteca e Lógica -->
+    <script src="math3d.js"></script>
+    <script src="obj-parser.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
