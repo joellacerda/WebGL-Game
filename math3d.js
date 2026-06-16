@@ -2,50 +2,68 @@
  * math3d.js
  * Biblioteca matemática 3D customizada implementando Álgebra Linear para WebGL.
  * Inclui operações manuais de Matriz 4x4 (Mat4) e Vetor 3D (Vec3).
+ * Otimizada para evitar alocações excessivas de memória (GC).
  */
 
 const Vec3 = {
-    // Subtrai dois vetores: a - b
-    subtract: function(a, b) {
-        return new Float32Array([
-            a[0] - b[0],
-            a[1] - b[1],
-            a[2] - b[2]
-        ]);
+    create: function(x = 0, y = 0, z = 0) {
+        return new Float32Array([x, y, z]);
     },
 
-    // Calcula o produto vetorial: a x b
-    cross: function(a, b) {
-        return new Float32Array([
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0]
-        ]);
+    set: function(out, x, y, z) {
+        out[0] = x; out[1] = y; out[2] = z;
+        return out;
     },
 
-    // Normaliza o vetor (retorna vetor com comprimento = 1)
-    normalize: function(v) {
+    copy: function(out, a) {
+        out[0] = a[0]; out[1] = a[1]; out[2] = a[2];
+        return out;
+    },
+
+    subtract: function(out, a, b) {
+        out[0] = a[0] - b[0];
+        out[1] = a[1] - b[1];
+        out[2] = a[2] - b[2];
+        return out;
+    },
+
+    cross: function(out, a, b) {
+        const ax = a[0], ay = a[1], az = a[2];
+        const bx = b[0], by = b[1], bz = b[2];
+        out[0] = ay * bz - az * by;
+        out[1] = az * bx - ax * bz;
+        out[2] = ax * by - ay * bx;
+        return out;
+    },
+
+    normalize: function(out, v) {
         const len = Math.hypot(v[0], v[1], v[2]);
         if (len > 0.00001) {
-            return new Float32Array([
-                v[0] / len,
-                v[1] / len,
-                v[2] / len
-            ]);
+            out[0] = v[0] / len;
+            out[1] = v[1] / len;
+            out[2] = v[2] / len;
+        } else {
+            out[0] = 0; out[1] = 0; out[2] = 0;
         }
-        return new Float32Array([0, 0, 0]);
+        return out;
     },
 
-    // Calcula o produto escalar (dot product)
     dot: function(a, b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    },
+
+    length: function(v) {
+        return Math.hypot(v[0], v[1], v[2]);
     }
 };
 
 const Mat4 = {
-    // Cria uma nova matriz identidade 4x4
-    identity: function() {
-        const out = new Float32Array(16);
+    create: function() {
+        return new Float32Array(16);
+    },
+
+    identity: function(out) {
+        out.fill(0);
         out[0] = 1;
         out[5] = 1;
         out[10] = 1;
@@ -53,54 +71,49 @@ const Mat4 = {
         return out;
     },
 
-    // Multiplica duas matrizes 4x4: out = a * b (ordem column-major)
-    multiply: function(a, b) {
-        const out = new Float32Array(16);
-        
-        const b00 = b[0],  b01 = b[1],  b02 = b[2],  b03 = b[3];
-        const b10 = b[4],  b11 = b[5],  b12 = b[6],  b13 = b[7];
-        const b20 = b[8],  b21 = b[9],  b22 = b[10], b23 = b[11];
-        const b30 = b[12], b31 = b[13], b32 = b[14], b33 = b[15];
+    multiply: function(out, a, b) {
+        const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+        const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+        const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+        const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
 
-        let a00 = a[0],  a01 = a[1],  a02 = a[2],  a03 = a[3];
-        out[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-        out[1] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-        out[2] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-        out[3] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+        let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+        out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-        a00 = a[4];  a01 = a[5];  a02 = a[6];  a03 = a[7];
-        out[4] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-        out[5] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-        out[6] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-        out[7] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+        b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+        out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-        a00 = a[8];  a01 = a[9];  a02 = a[10]; a03 = a[11];
-        out[8] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-        out[9] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-        out[10] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-        out[11] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+        b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+        out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
-        a00 = a[12]; a01 = a[13]; a02 = a[14]; a03 = a[15];
-        out[12] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-        out[13] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-        out[14] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-        out[15] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+        b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+        out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
         return out;
     },
 
-    // Cria uma matriz de translação
-    translation: function(x, y, z) {
-        const out = this.identity();
+    translation: function(out, x, y, z) {
+        this.identity(out);
         out[12] = x;
         out[13] = y;
         out[14] = z;
         return out;
     },
 
-    // Cria uma matriz de escala
-    scale: function(x, y, z) {
-        const out = new Float32Array(16);
+    scale: function(out, x, y, z) {
+        out.fill(0);
         out[0] = x;
         out[5] = y;
         out[10] = z;
@@ -108,103 +121,40 @@ const Mat4 = {
         return out;
     },
 
-    // Cria uma matriz de rotação no eixo X (ângulo em radianos)
-    rotationX: function(angle) {
-        const out = this.identity();
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        out[5] = c;
-        out[6] = s;
-        out[9] = -s;
-        out[10] = c;
-        return out;
-    },
-
-    // Cria uma matriz de rotação no eixo Y (ângulo em radianos)
-    rotationY: function(angle) {
-        const out = this.identity();
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        out[0] = c;
-        out[2] = -s;
-        out[8] = s;
-        out[10] = c;
-        return out;
-    },
-
-    // Cria uma matriz de rotação no eixo Z (ângulo em radianos)
-    rotationZ: function(angle) {
-        const out = this.identity();
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        out[0] = c;
-        out[1] = s;
-        out[4] = -s;
-        out[5] = c;
-        return out;
-    },
-
-    // Implementação manual da Matriz de Projeção Perspectiva
-    perspective: function(fovY, aspect, near, far) {
-        const out = new Float32Array(16);
+    perspective: function(out, fovY, aspect, near, far) {
         const f = 1.0 / Math.tan(fovY / 2.0);
         const nf = 1.0 / (near - far);
-        
+        out.fill(0);
         out[0] = f / aspect;
         out[5] = f;
         out[10] = (far + near) * nf;
         out[11] = -1;
-        out[14] = 2 * far * near * nf;
+        out[14] = (2 * far * near) * nf;
         out[15] = 0;
-        
         return out;
     },
 
-    // Implementação manual da Matriz de Visualização LookAt
-    lookAt: function(eye, center, up) {
-        const out = new Float32Array(16);
-        
-        // z = normalize(eye - center) -- direção oposta de onde estamos olhando
-        let z = Vec3.subtract(eye, center);
-        z = Vec3.normalize(z);
-        
-        // x = normalize(up x z) -- vetor direito
-        let x = Vec3.cross(up, z);
-        x = Vec3.normalize(x);
-        
-        // y = z x x -- vetor para cima ortogonalizado
-        const y = Vec3.cross(z, x);
-        
-        // Translação negativa acumulada
-        const tx = -Vec3.dot(x, eye);
-        const ty = -Vec3.dot(y, eye);
-        const tz = -Vec3.dot(z, eye);
-        
-        // Preenche em ordem column-major
-        out[0] = x[0];
-        out[1] = y[0];
-        out[2] = z[0];
-        out[3] = 0;
-        
-        out[4] = x[1];
-        out[5] = y[1];
-        out[6] = z[1];
-        out[7] = 0;
-        
-        out[8] = x[2];
-        out[9] = y[2];
-        out[10] = z[2];
-        out[11] = 0;
-        
-        out[12] = tx;
-        out[13] = ty;
-        out[14] = tz;
+    lookAt: function(out, eye, center, up) {
+        const x = Vec3.create();
+        const y = Vec3.create();
+        const z = Vec3.create();
+
+        Vec3.subtract(z, eye, center);
+        Vec3.normalize(z, z);
+        Vec3.cross(x, up, z);
+        Vec3.normalize(x, x);
+        Vec3.cross(y, z, x);
+
+        out[0] = x[0]; out[1] = y[0]; out[2] = z[0]; out[3] = 0;
+        out[4] = x[1]; out[5] = y[1]; out[6] = z[1]; out[7] = 0;
+        out[8] = x[2]; out[9] = y[2]; out[10] = z[2]; out[11] = 0;
+        out[12] = -Vec3.dot(x, eye);
+        out[13] = -Vec3.dot(y, eye);
+        out[14] = -Vec3.dot(z, eye);
         out[15] = 1;
-        
         return out;
     }
 };
 
-// Exportar globalmente para o navegador
 window.Vec3 = Vec3;
 window.Mat4 = Mat4;
