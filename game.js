@@ -191,43 +191,34 @@ window.addEventListener("DOMContentLoaded", () => {
                 aNormal: gl.getAttribLocation(shaderProgram, "aNormal")
             };
 
-            if (loaderText) loaderText.textContent = "Carregando labirinto (assets/labyrinth.glb)...";
-            const meshes = await GLBLoader.load(gl, 'assets/labyrinth.glb');
+            if (loaderText) loaderText.textContent = "Carregando labirinto (assets/labyrinth.obj)...";
+            const meshData = await OBJParser.loadAndParse('assets/labyrinth.obj');
 
-            for (const meshData of meshes) {
-                const mesh = {
-                    vao: gl.createVertexArray(),
-                    count: meshData.count,
-                    hasIndices: meshData.indices !== null,
-                    indexType: gl.UNSIGNED_SHORT,
-                    rawPositions: meshData.attributes.POSITION,
-                    rawIndices: meshData.indices
-                };
+            const mesh = {
+                vao: gl.createVertexArray(),
+                count: meshData.positions.length / 3,
+                hasIndices: false,
+                rawPositions: meshData.positions,
+                rawIndices: null
+            };
 
-                gl.bindVertexArray(mesh.vao);
-                if (meshData.attributes.POSITION) {
-                    const buf = gl.createBuffer();
-                    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-                    gl.bufferData(gl.ARRAY_BUFFER, meshData.attributes.POSITION, gl.STATIC_DRAW);
-                    gl.enableVertexAttribArray(locations.aPosition);
-                    gl.vertexAttribPointer(locations.aPosition, 3, gl.FLOAT, false, 0, 0);
-                }
-                if (meshData.attributes.NORMAL) {
-                    const buf = gl.createBuffer();
-                    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-                    gl.bufferData(gl.ARRAY_BUFFER, meshData.attributes.NORMAL, gl.STATIC_DRAW);
-                    gl.enableVertexAttribArray(locations.aNormal);
-                    gl.vertexAttribPointer(locations.aNormal, 3, gl.FLOAT, false, 0, 0);
-                }
-                if (meshData.indices) {
-                    const buf = gl.createBuffer();
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf);
-                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshData.indices, gl.STATIC_DRAW);
-                    mesh.indexType = (meshData.indices instanceof Uint32Array) ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
-                }
-                gl.bindVertexArray(null);
-                labyrinthMeshes.push(mesh);
+            gl.bindVertexArray(mesh.vao);
+            if (meshData.positions) {
+                const buf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.bufferData(gl.ARRAY_BUFFER, meshData.positions, gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(locations.aPosition);
+                gl.vertexAttribPointer(locations.aPosition, 3, gl.FLOAT, false, 0, 0);
             }
+            if (meshData.normals) {
+                const buf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.bufferData(gl.ARRAY_BUFFER, meshData.normals, gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(locations.aNormal);
+                gl.vertexAttribPointer(locations.aNormal, 3, gl.FLOAT, false, 0, 0);
+            }
+            gl.bindVertexArray(null);
+            labyrinthMeshes.push(mesh);
 
             extractWallSegments();
             validateStartPosition();
