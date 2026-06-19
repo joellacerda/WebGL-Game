@@ -152,16 +152,47 @@ window.addEventListener("DOMContentLoaded", () => {
     uniform float uShininess;
     uniform vec3 uSpecularColor;
 
+    uniform sampler2D uAlbedoMap;
+    uniform sampler2D uRoughnessMap;
+    uniform sampler2D uGroundAlbedoMap;
+
     void main() {
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(uCameraPos - vWorldPos);
 
-        // Diferenciar cor base do material: Grama (chão) vs Pedra (paredes) usando a normal vertical
-        vec3 baseColor;
-        if (normal.y > 0.8) {
-            baseColor = vec3(0.3, 0.3, 0.3); // Chão de cor sólida cinza (por enquanto)
+        // Calcular UVs baseados na posição do mundo (World-space planar mapping)
+        vec2 uv;
+        if (abs(normal.y) > 0.8) {
+            uv = vWorldPos.xz * 0.5; // Chão/Teto
+        } else if (abs(normal.x) > abs(normal.z)) {
+            uv = vec2(vWorldPos.z, vWorldPos.y) * 0.8; // Parede alinhada com X (projetada no plano ZY)
         } else {
-            baseColor = vec3(0.35, 0.35, 0.38); // Paredes de Pedra (Cinza escuro)
+            uv = vec2(vWorldPos.x, vWorldPos.y) * 0.8; // Parede alinhada com Z (projetada no plano XY)
+        }
+
+        // Amostrar texturas
+        vec3 texColor = texture(uAlbedoMap, uv).rgb;
+        float texRoughness = texture(uRoughnessMap, uv).r;
+
+        // Diferenciar cor base e propriedades do material: Grama (chão) vs Pedra (paredes) usando a normal vertical
+        vec3 baseColor;
+        vec3 specColorMat;
+        float shininessMat;
+
+        if (normal.y > 0.8) {
+            // Chão (Floor)
+            baseColor = texture(uGroundAlbedoMap, uv).rgb;
+            specColorMat = vec3(0.04);                         // Chão rochoso é bem áspero, reflete pouco
+            shininessMat = 6.0;
+        } else if (normal.y < -0.8) {
+            // Teto (Ceiling) se houver
+            baseColor = vec3(0.15, 0.15, 0.15);                // Cor escura sólida
+            specColorMat = vec3(0.0);
+            shininessMat = 1.0;
+        } else {
+            baseColor = texColor; // Textura de tijolos com musgo para as paredes
+            specColorMat = vec3(0.12) * (1.0 - texRoughness); // Especularidade baseada no roughness
+            shininessMat = mix(4.0, 40.0, 1.0 - texRoughness); // Shininess dinâmico baseado no roughness
         }
 
         // Iluminação Ambiente global sutil (aumentada significativamente para visualização sem lanterna)
@@ -179,9 +210,9 @@ window.addEventListener("DOMContentLoaded", () => {
         // Difusa e Especular de Phong
         float diff1 = max(dot(normal, light1Dir), 0.0);
         vec3 reflectDir1 = reflect(-light1Dir, normal);
-        float spec1 = pow(max(dot(viewDir, reflectDir1), 0.0), uShininess);
+        float spec1 = pow(max(dot(viewDir, reflectDir1), 0.0), shininessMat);
 
-        vec3 light1Contribution = (diff1 * baseColor + spec1 * uSpecularColor) * uLight1Color * intensity1 * atten1;
+        vec3 light1Contribution = (diff1 * baseColor + spec1 * specColorMat) * uLight1Color * intensity1 * atten1;
 
         // --- LUZ 2: OLHO DE JADE NO CÉU (Spotlight verde, amplo e móvel) ---
         vec3 light2Dir = normalize(uEyePos - vWorldPos);
@@ -195,9 +226,9 @@ window.addEventListener("DOMContentLoaded", () => {
         // Difusa e Especular de Phong
         float diff2 = max(dot(normal, light2Dir), 0.0);
         vec3 reflectDir2 = reflect(-light2Dir, normal);
-        float spec2 = pow(max(dot(viewDir, reflectDir2), 0.0), uShininess);
+        float spec2 = pow(max(dot(viewDir, reflectDir2), 0.0), shininessMat);
 
-        vec3 light2Contribution = (diff2 * baseColor + spec2 * uSpecularColor) * uLight2Color * intensity2 * atten2;
+        vec3 light2Contribution = (diff2 * baseColor + spec2 * specColorMat) * uLight2Color * intensity2 * atten2;
 
         // --- MODELO DE REFLEXÃO DE PHONG COMPLETO (Soma dos termos) ---
         vec3 finalColor = ambient + light1Contribution + light2Contribution;
@@ -233,6 +264,10 @@ window.addEventListener("DOMContentLoaded", () => {
     let isLoaded = false;
     let wallSegments = new Float32Array(0);
 
+    let wallAlbedoTexture;
+    let wallRoughnessTexture;
+    let groundAlbedoTexture;
+
     let coneProgram;
     let coneLocations = {};
     let coneVAO, coneVBO;
@@ -260,6 +295,39 @@ window.addEventListener("DOMContentLoaded", () => {
         return program;
     }
 
+    function loadTexture(gl, url) {
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        // Preenche com uma cor cinza temporária (1x1 pixel) enquanto carrega
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([100, 100, 100, 255]));
+
+        const image = new Image();
+        image.onload = function() {
+            gl.activeTexture(gl.TEXTURE0); // Garante a unidade 0 para o upload
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            console.log(`Textura carregada com sucesso: ${url}`);
+
+            const err = gl.getError();
+            if (err !== gl.NO_ERROR) {
+                console.error(`Erro WebGL no onload de ${url}: ${err}`);
+            }
+        };
+        image.onerror = function() {
+            console.error(`Erro ao carregar a textura: ${url}`);
+        };
+        image.src = url;
+
+        return texture;
+    }
+
     async function initGame() {
         try {
             shaderProgram = createProgram(gl, vsSource, fsSource);
@@ -275,9 +343,18 @@ window.addEventListener("DOMContentLoaded", () => {
                 uLight2Color: gl.getUniformLocation(shaderProgram, "uLight2Color"),
                 uShininess: gl.getUniformLocation(shaderProgram, "uShininess"),
                 uSpecularColor: gl.getUniformLocation(shaderProgram, "uSpecularColor"),
+                uAlbedoMap: gl.getUniformLocation(shaderProgram, "uAlbedoMap"),
+                uRoughnessMap: gl.getUniformLocation(shaderProgram, "uRoughnessMap"),
+                uGroundAlbedoMap: gl.getUniformLocation(shaderProgram, "uGroundAlbedoMap"),
                 aPosition: gl.getAttribLocation(shaderProgram, "aPosition"),
                 aNormal: gl.getAttribLocation(shaderProgram, "aNormal")
             };
+            console.log("Uniform Locations:", locations);
+
+            if (loaderText) loaderText.textContent = "Carregando texturas...";
+            wallAlbedoTexture = loadTexture(gl, 'assets/plaster_brick_01_diff_1k.jpg');
+            wallRoughnessTexture = loadTexture(gl, 'assets/plaster_brick_01_rough_1k.jpg');
+            groundAlbedoTexture = loadTexture(gl, 'assets/rocky_terrain_diff_1k.jpg');
 
             if (loaderText) loaderText.textContent = "Carregando labirinto (assets/labyrinth.obj)...";
             const meshData = await OBJParser.loadAndParse('assets/labyrinth.obj');
@@ -575,6 +652,23 @@ window.addEventListener("DOMContentLoaded", () => {
         // Parâmetros de Especularidade (Modelo de Phong completo)
         gl.uniform1f(locations.uShininess, 32.0);
         gl.uniform3fv(locations.uSpecularColor, specColor);
+
+        // Bindar texturas para as paredes
+        if (wallAlbedoTexture) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, wallAlbedoTexture);
+            gl.uniform1i(locations.uAlbedoMap, 0);
+        }
+        if (wallRoughnessTexture) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, wallRoughnessTexture);
+            gl.uniform1i(locations.uRoughnessMap, 1);
+        }
+        if (groundAlbedoTexture) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, groundAlbedoTexture);
+            gl.uniform1i(locations.uGroundAlbedoMap, 2);
+        }
 
         for (const mesh of labyrinthMeshes) {
             gl.bindVertexArray(mesh.vao);
