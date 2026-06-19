@@ -180,7 +180,7 @@ window.addEventListener("DOMContentLoaded", () => {
         float shininessMat;
 
         if (normal.y > 0.8) {
-            // Chão (Floor)
+            // Chão (Floor) — Textura de terreno rochoso
             baseColor = texture(uGroundAlbedoMap, uv).rgb;
             specColorMat = vec3(0.04);                         // Chão rochoso é bem áspero, reflete pouco
             shininessMat = 6.0;
@@ -261,6 +261,7 @@ window.addEventListener("DOMContentLoaded", () => {
     let shaderProgram;
     let locations = {};
     let labyrinthMeshes = [];
+    let floorMesh = null;
     let isLoaded = false;
     let wallSegments = new Float32Array(0);
 
@@ -384,6 +385,53 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             gl.bindVertexArray(null);
             labyrinthMeshes.push(mesh);
+
+            // --- CRIAR CHÃO (FLOOR) PROCEDURAL ---
+            // O arquivo OBJ contém somente geometria das paredes.
+            // O chão é um quad (2 triângulos) em Y=0 cobrindo toda a área do labirinto.
+            // As coordenadas estão no espaço normalizado do OBJ (~0 a 0.31).
+            // O model matrix (mazeScale) escalará para o espaço do mundo.
+            const floorExtent = 0.31; // Margem além do bounding box do OBJ (max ~0.303)
+            const floorY = 0.0001;    // Levemente acima de Y=0 para evitar z-fighting com a base das paredes
+            // prettier-ignore
+            const floorPositions = new Float32Array([
+                // Triângulo 1 (CCW visto de cima: 0,0 → 0.31,0.31 → 0.31,0)
+                0.0,         floorY, 0.0,
+                floorExtent, floorY, floorExtent,
+                floorExtent, floorY, 0.0,
+                // Triângulo 2 (CCW visto de cima: 0,0 → 0,0.31 → 0.31,0.31)
+                0.0,         floorY, 0.0,
+                0.0,         floorY, floorExtent,
+                floorExtent, floorY, floorExtent
+            ]);
+            // prettier-ignore
+            const floorNormals = new Float32Array([
+                0, 1, 0,  0, 1, 0,  0, 1, 0,
+                0, 1, 0,  0, 1, 0,  0, 1, 0
+            ]);
+
+            const floorVAO = gl.createVertexArray();
+            gl.bindVertexArray(floorVAO);
+
+            const floorPosBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, floorPosBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, floorPositions, gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(locations.aPosition);
+            gl.vertexAttribPointer(locations.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+            const floorNrmBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, floorNrmBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, floorNormals, gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(locations.aNormal);
+            gl.vertexAttribPointer(locations.aNormal, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindVertexArray(null);
+
+            floorMesh = {
+                vao: floorVAO,
+                count: 6 // 2 triângulos × 3 vértices
+            };
+            console.log("Chão do labirinto criado com sucesso.");
 
             // Inicializar Shader e VBO do Cone de Luz (Olho de Jade)
             coneProgram = createProgram(gl, coneVSSource, coneFSSource);
@@ -674,6 +722,14 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.bindVertexArray(mesh.vao);
             if (mesh.hasIndices) gl.drawElements(gl.TRIANGLES, mesh.count, mesh.indexType, 0);
             else gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+        }
+
+        // --- DESENHAR CHÃO DO LABIRINTO ---
+        // Usa o mesmo model matrix (mazeScale) que as paredes, para manter escala consistente
+        if (floorMesh) {
+            gl.bindVertexArray(floorMesh.vao);
+            gl.drawArrays(gl.TRIANGLES, 0, floorMesh.count);
+            gl.bindVertexArray(null);
         }
 
         // --- DESENHAR CONE DE LUZ DO OLHO DE JADE (Translúcido / Volumétrico) ---
