@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL 3D Engine - Boilerplate</title>
+    <title>O Labirinto de Jade</title>
     <!-- Importar fontes modernas do Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Outfit:wght@300;400;600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
     <!-- Canvas WebGL Principal -->
@@ -20,7 +24,7 @@
 
     <!-- Interface HUD do Desenvolvedor -->
     <div class="hud-container">
-        
+
         <!-- Painel de Estatísticas em Tempo Real -->
         <div class="hud-bar-container dev-stats">
             <div class="hud-label">ESTATÍSTICAS DA CÂMERA</div>
@@ -30,17 +34,8 @@
             <div class="stat-row">Luz Ativa: <span id="statLight">Pêndulo (Verde)</span></div>
         </div>
 
-        <!-- Painel de Título -->
-        <div class="hud-header">
-            <h1 class="game-title">3D ENGINE</h1>
-            <div class="game-subtitle">BOILERPLATE WEBGL PURE</div>
-        </div>
-
         <!-- Painel de Instruções e Código (Glassmorphic) -->
         <div class="control-panel" id="controlPanel">
-            <h3 class="panel-title">PAINEL DE FERRAMENTAS</h3>
-            <p class="panel-desc">Estrutura base pronta para criação do seu próprio jogo. Insira seus shaders e geometrias no loop principal.</p>
-            
             <div class="controls-guide">
                 <div class="control-row">
                     <span class="key">W</span>
@@ -55,16 +50,8 @@
                 </div>
                 <div class="control-row">
                     <span class="key" id="lightToggle">L</span>
-                    <span class="control-desc">Alternar Luz (Pêndulo / Câmera)</span>
+                    <span class="control-desc">Alternar Luz (Lanterna)</span>
                 </div>
-            </div>
-
-            <div class="pointer-status" id="pointerStatus">
-                Clique na tela para capturar o mouse (Pointer Lock)
-            </div>
-
-            <div class="panel-footer">
-                Altere <code>game.js</code> para customizar a cena
             </div>
         </div>
     </div>
@@ -83,4 +70,5 @@
     <script src="obj-parser.js"></script>
     <script src="game.js"></script>
 </body>
+
 </html>

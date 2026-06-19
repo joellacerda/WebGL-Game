@@ -45,8 +45,12 @@ window.addEventListener("DOMContentLoaded", () => {
     // =========================================================================
     // 2. SISTEMA DE CÂMERA E INPUTS
     // =========================================================================
-    // Ajustado para [20, 0.5, 20] para acompanhar o dobro da escala (antes era [10, 10] na escala 20)
-    const cameraPos = Vec3.create(20.0, 0.25, 20.0);
+    // Configurações de Escala e Dimensões do Labirinto
+    const mazeScale = 60.0;              // Ajustado para 60 para reduzir o espaçamento dos corredores (paredes mais próximas)
+    const wallHeightMultiplier = 1.2;    // Ajustado para manter a altura física das paredes em ~1.77 unidades
+
+    // Câmera do Jogador
+    const cameraPos = Vec3.create(mazeScale * 0.15, 0.25, mazeScale * 0.15); // Inicializa no centro do labirinto (ajustado no validate)
     const cameraFront = Vec3.create(0.0, 0.0, -1.0);
     const cameraUp = Vec3.create(0.0, 1.0, 0.0);
 
@@ -55,7 +59,15 @@ window.addEventListener("DOMContentLoaded", () => {
     const keys = { W: false, A: false, S: false, D: false };
     let isLightOn = true;
     const mouseSensitivity = 0.15;
-    const movementSpeed = 3.0;
+    const movementSpeed = 1.8;           // Reduzido para movimentação mais lenta e atmosférica
+
+    // Configurações do Olho de Jade (Luz Móvel e Ameaça)
+    const eyePos = Vec3.create(mazeScale * 0.15, 8.0, mazeScale * 0.15);      // Posição fixa no topo do centro do labirinto
+    const eyeDir = Vec3.create(0.0, -1.0, 0.0);                               // Direção do feixe do olho (inicialmente para baixo)
+    const eyeTarget = Vec3.create(mazeScale * 0.15, 0.0, mazeScale * 0.15);   // Ponto que a luz está iluminando no chão
+    const eyeTargetWaypoint = Vec3.create(mazeScale * 0.15, 0.0, mazeScale * 0.15); // Próximo waypoint aleatório do feixe
+    const light2Color = Vec3.create(0.0, 1.0, 0.1);  // Luz verde de Jade
+    let eyeWaypointTimer = 0.0;
 
     window.addEventListener("keydown", (e) => {
         const k = e.key.toUpperCase();
@@ -128,31 +140,102 @@ window.addEventListener("DOMContentLoaded", () => {
     in vec3 vWorldPos;
     in vec3 vNormal;
     out vec4 fragColor;
+
     uniform vec3 uCameraPos;
     uniform vec3 uCameraFront;
-    uniform vec3 uLightColor;
-    void main() {
-        vec3 lightDir = normalize(uCameraPos - vWorldPos);
-        float distance = length(uCameraPos - vWorldPos);
-        float attenuation = 1.0 / (1.0 + 0.02 * distance + 0.01 * distance * distance);
-        
-        float spotEffect = dot(normalize(uCameraFront), -lightDir);
-        float spotCutoff = 0.85;
-        float intensity = smoothstep(spotCutoff, spotCutoff + 0.1, spotEffect);
+    uniform vec3 uLight1Color;   // Cor da lanterna do Jogador (Luz 1)
 
-        float diff = max(dot(vNormal, lightDir), 0.0);
-        vec3 ambient = vec3(0.02, 0.02, 0.04);
-        vec3 finalColor = (ambient + diff * uLightColor * intensity * attenuation) * vec3(0.6);
+    uniform vec3 uEyePos;        // Posição do Olho de Jade (Luz 2)
+    uniform vec3 uEyeDir;        // Direção do feixe do Olho de Jade
+    uniform vec3 uLight2Color;   // Cor do feixe do Olho de Jade (Verde)
+
+    uniform float uShininess;
+    uniform vec3 uSpecularColor;
+
+    void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(uCameraPos - vWorldPos);
+
+        // Diferenciar cor base do material: Grama (chão) vs Pedra (paredes) usando a normal vertical
+        vec3 baseColor;
+        if (normal.y > 0.8) {
+            baseColor = vec3(0.3, 0.3, 0.3); // Chão de cor sólida cinza (por enquanto)
+        } else {
+            baseColor = vec3(0.35, 0.35, 0.38); // Paredes de Pedra (Cinza escuro)
+        }
+
+        // Iluminação Ambiente global sutil (aumentada significativamente para visualização sem lanterna)
+        vec3 ambient = vec3(0.25, 0.25, 0.28) * baseColor;
+
+        // --- LUZ 1: LANTERNA DO JOGADOR (Spotlight branco/amarelado) ---
+        vec3 light1Dir = normalize(uCameraPos - vWorldPos);
+        float dist1 = length(uCameraPos - vWorldPos);
+        float atten1 = 1.0 / (1.0 + 0.02 * dist1 + 0.01 * dist1 * dist1);
+        
+        float spotEffect1 = dot(normalize(uCameraFront), -light1Dir);
+        float spotCutoff1 = 0.85; // Cone concentrado
+        float intensity1 = smoothstep(spotCutoff1, spotCutoff1 + 0.08, spotEffect1);
+
+        // Difusa e Especular de Phong
+        float diff1 = max(dot(normal, light1Dir), 0.0);
+        vec3 reflectDir1 = reflect(-light1Dir, normal);
+        float spec1 = pow(max(dot(viewDir, reflectDir1), 0.0), uShininess);
+
+        vec3 light1Contribution = (diff1 * baseColor + spec1 * uSpecularColor) * uLight1Color * intensity1 * atten1;
+
+        // --- LUZ 2: OLHO DE JADE NO CÉU (Spotlight verde, amplo e móvel) ---
+        vec3 light2Dir = normalize(uEyePos - vWorldPos);
+        float dist2 = length(uEyePos - vWorldPos);
+        float atten2 = 1.0 / (1.0 + 0.005 * dist2 + 0.002 * dist2 * dist2); // Atenuação menor para alcance amplo
+        
+        float spotEffect2 = dot(normalize(uEyeDir), -light2Dir);
+        float spotCutoff2 = 0.93; // Cone mais fechado (raio no chão de 3.0 unidades com altura de 8.0)
+        float intensity2 = smoothstep(spotCutoff2, spotCutoff2 + 0.04, spotEffect2);
+
+        // Difusa e Especular de Phong
+        float diff2 = max(dot(normal, light2Dir), 0.0);
+        vec3 reflectDir2 = reflect(-light2Dir, normal);
+        float spec2 = pow(max(dot(viewDir, reflectDir2), 0.0), uShininess);
+
+        vec3 light2Contribution = (diff2 * baseColor + spec2 * uSpecularColor) * uLight2Color * intensity2 * atten2;
+
+        // --- MODELO DE REFLEXÃO DE PHONG COMPLETO (Soma dos termos) ---
+        vec3 finalColor = ambient + light1Contribution + light2Contribution;
         fragColor = vec4(finalColor, 1.0);
+    }`;
+
+    // --- SHADERS DO CONE DE LUZ DO OLHO DE JADE (Volumétrico/Translúcido) ---
+    const coneVSSource = `#version 300 es
+    in vec3 aPosition;
+    uniform mat4 uProjectionMatrix;
+    uniform mat4 uViewMatrix;
+    out float vHeightFactor;
+    void main() {
+        // aPosition.y vai de ~0.0 (chão) até 8.0 (olho)
+        vHeightFactor = aPosition.y / 8.0;
+        gl_Position = uProjectionMatrix * uViewMatrix * vec4(aPosition, 1.0);
+    }`;
+
+    const coneFSSource = `#version 300 es
+    precision highp float;
+    in float vHeightFactor;
+    out vec4 fragColor;
+    uniform vec3 uConeColor;
+    void main() {
+        // Efeito volumétrico: mais brilhante no topo (perto do olho) e mais suave embaixo
+        float alpha = mix(0.03, 0.22, vHeightFactor);
+        fragColor = vec4(uConeColor, alpha);
     }`;
 
     let shaderProgram;
     let locations = {};
     let labyrinthMeshes = [];
     let isLoaded = false;
-    const mazeScale = 40.0;
-    const wallHeightMultiplier = 3.0;
     let wallSegments = new Float32Array(0);
+
+    let coneProgram;
+    let coneLocations = {};
+    let coneVAO, coneVBO;
 
     function compileShader(gl, source, type) {
         const shader = gl.createShader(type);
@@ -186,7 +269,12 @@ window.addEventListener("DOMContentLoaded", () => {
                 uModelMatrix: gl.getUniformLocation(shaderProgram, "uModelMatrix"),
                 uCameraPos: gl.getUniformLocation(shaderProgram, "uCameraPos"),
                 uCameraFront: gl.getUniformLocation(shaderProgram, "uCameraFront"),
-                uLightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
+                uLight1Color: gl.getUniformLocation(shaderProgram, "uLight1Color"),
+                uEyePos: gl.getUniformLocation(shaderProgram, "uEyePos"),
+                uEyeDir: gl.getUniformLocation(shaderProgram, "uEyeDir"),
+                uLight2Color: gl.getUniformLocation(shaderProgram, "uLight2Color"),
+                uShininess: gl.getUniformLocation(shaderProgram, "uShininess"),
+                uSpecularColor: gl.getUniformLocation(shaderProgram, "uSpecularColor"),
                 aPosition: gl.getAttribLocation(shaderProgram, "aPosition"),
                 aNormal: gl.getAttribLocation(shaderProgram, "aNormal")
             };
@@ -219,6 +307,25 @@ window.addEventListener("DOMContentLoaded", () => {
             }
             gl.bindVertexArray(null);
             labyrinthMeshes.push(mesh);
+
+            // Inicializar Shader e VBO do Cone de Luz (Olho de Jade)
+            coneProgram = createProgram(gl, coneVSSource, coneFSSource);
+            coneLocations = {
+                aPosition: gl.getAttribLocation(coneProgram, "aPosition"),
+                uProjectionMatrix: gl.getUniformLocation(coneProgram, "uProjectionMatrix"),
+                uViewMatrix: gl.getUniformLocation(coneProgram, "uViewMatrix"),
+                uConeColor: gl.getUniformLocation(coneProgram, "uConeColor")
+            };
+
+            coneVAO = gl.createVertexArray();
+            coneVBO = gl.createBuffer();
+            gl.bindVertexArray(coneVAO);
+            gl.bindBuffer(gl.ARRAY_BUFFER, coneVBO);
+            // 16 pontos de base + 1 ápice + 1 duplicado para fechar o leque = 18 vértices de 3 floats
+            gl.bufferData(gl.ARRAY_BUFFER, (16 + 2) * 3 * 4, gl.DYNAMIC_DRAW);
+            gl.enableVertexAttribArray(coneLocations.aPosition);
+            gl.vertexAttribPointer(coneLocations.aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindVertexArray(null);
 
             extractWallSegments();
             validateStartPosition();
@@ -317,12 +424,32 @@ window.addEventListener("DOMContentLoaded", () => {
         return false;
     }
 
-    // Adiciona log para verificar se a posição inicial está em colisão
+    // Valida e reposiciona o jogador de forma segura caso ele nasça dentro de uma parede
     function validateStartPosition() {
         if (checkCollision(cameraPos[0], cameraPos[2])) {
-            console.error("ERRO: Jogador iniciou DENTRO de uma parede!", cameraPos);
+            console.warn("Posição inicial em colisão! Procurando local seguro próximo...");
+            let found = false;
+            // Busca espiral em torno da posição inicial para encontrar uma área livre de colisão
+            for (let r = 0.5; r < 20.0; r += 0.5) {
+                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+                    const testX = cameraPos[0] + Math.cos(angle) * r;
+                    const testZ = cameraPos[2] + Math.sin(angle) * r;
+                    if (!checkCollision(testX, testZ)) {
+                        cameraPos[0] = testX;
+                        cameraPos[2] = testZ;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            if (found) {
+                console.log("Nova posição segura atribuída com sucesso:", cameraPos);
+            } else {
+                console.error("ERRO: Não foi possível encontrar nenhum local sem colisão!");
+            }
         } else {
-            console.log("Posição inicial válida.");
+            console.log("Posição inicial válida:", cameraPos);
         }
     }
 
@@ -380,6 +507,28 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        // Restringir limites físicos da câmera do jogador aos limites do labirinto
+        cameraPos[0] = Math.max(1.0, Math.min(mazeScale * 0.3 - 1.0, cameraPos[0]));
+        cameraPos[2] = Math.max(1.0, Math.min(mazeScale * 0.3 - 1.0, cameraPos[2]));
+
+        // Lógica de Movimentação Aleatória e Suave do Feixe do Olho de Jade
+        eyeWaypointTimer += dt;
+        const distToWp = Math.hypot(eyeTarget[0] - eyeTargetWaypoint[0], eyeTarget[2] - eyeTargetWaypoint[2]);
+        if (eyeWaypointTimer > 12.0 || distToWp < 0.8) {
+            // Sorteia um novo waypoint aleatório dentro do limite espacial do labirinto
+            eyeTargetWaypoint[0] = 3.0 + Math.random() * (mazeScale * 0.3 - 6.0);
+            eyeTargetWaypoint[2] = 3.0 + Math.random() * (mazeScale * 0.3 - 6.0);
+            eyeWaypointTimer = 0.0;
+        }
+        
+        // Interpola suavemente a posição do feixe (fator de interpolação reduzido de 1.2 para 0.4 para movimento suave e lento)
+        eyeTarget[0] += (eyeTargetWaypoint[0] - eyeTarget[0]) * dt * 0.4;
+        eyeTarget[2] += (eyeTargetWaypoint[2] - eyeTarget[2]) * dt * 0.4;
+
+        // Atualiza a direção do feixe de luz do olho (olhando para o alvo no chão)
+        Vec3.subtract(eyeDir, eyeTarget, eyePos);
+        Vec3.normalize(eyeDir, eyeDir);
+
         document.getElementById("statPos").textContent = `[${cameraPos[0].toFixed(1)}, ${cameraPos[1].toFixed(1)}, ${cameraPos[2].toFixed(1)}]`;
     }
 
@@ -388,6 +537,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const modelMatrix = Mat4.create();
     const lookAtTarget = Vec3.create();
     const lookAtDir = Vec3.create();
+    const specColor = Vec3.create(1.0, 1.0, 1.0); // Cor de brilho especular branco
 
     function render() {
         if (!isLoaded) return;
@@ -407,18 +557,70 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.uniformMatrix4fv(locations.uProjectionMatrix, false, projMatrix);
         gl.uniformMatrix4fv(locations.uViewMatrix, false, viewMatrix);
         gl.uniformMatrix4fv(locations.uModelMatrix, false, modelMatrix);
+        
+        // Dados da Câmera
         gl.uniform3fv(locations.uCameraPos, cameraPos);
         gl.uniform3fv(locations.uCameraFront, cameraFront);
         
-        const lightColor = isLightOn ? [1.0, 0.9, 0.7] : [0.0, 0.0, 0.0];
-        gl.uniform3fv(locations.uLightColor, lightColor);
+        // Luz 1: Lanterna do Jogador (Branca/Amarelada)
+        const light1Color = isLightOn ? [1.0, 0.95, 0.85] : [0.0, 0.0, 0.0];
+        gl.uniform3fv(locations.uLight1Color, light1Color);
         document.getElementById("statLight").textContent = isLightOn ? "Lanterna (Ligada)" : "Escuridão (Desligada)";
+
+        // Luz 2: Olho de Jade (Posição, Direção e Cor)
+        gl.uniform3fv(locations.uEyePos, eyePos);
+        gl.uniform3fv(locations.uEyeDir, eyeDir);
+        gl.uniform3fv(locations.uLight2Color, light2Color);
+
+        // Parâmetros de Especularidade (Modelo de Phong completo)
+        gl.uniform1f(locations.uShininess, 32.0);
+        gl.uniform3fv(locations.uSpecularColor, specColor);
 
         for (const mesh of labyrinthMeshes) {
             gl.bindVertexArray(mesh.vao);
             if (mesh.hasIndices) gl.drawElements(gl.TRIANGLES, mesh.count, mesh.indexType, 0);
             else gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
         }
+
+        // --- DESENHAR CONE DE LUZ DO OLHO DE JADE (Translúcido / Volumétrico) ---
+        const N = 16;
+        const coneCoords = new Float32Array((N + 2) * 3);
+        // Ápice no Olho de Jade
+        coneCoords[0] = eyePos[0];
+        coneCoords[1] = eyePos[1];
+        coneCoords[2] = eyePos[2];
+        
+        // Círculo base no chão (raio do feixe)
+        const coneRadius = 3.0; // Raio da cônica ajustado para 3.0 unidades para bater com spotCutoff2 = 0.93
+        for (let i = 0; i <= N; i++) {
+            const angle = (i % N) * 2 * Math.PI / N;
+            const idx = (i + 1) * 3;
+            coneCoords[idx] = eyeTarget[0] + Math.cos(angle) * coneRadius;
+            coneCoords[idx+1] = 0.05; // Levemente acima do chão (Y=0) para evitar z-fighting
+            coneCoords[idx+2] = eyeTarget[2] + Math.sin(angle) * coneRadius;
+        }
+
+        // Upload dinâmico dos vértices do cone
+        gl.bindBuffer(gl.ARRAY_BUFFER, coneVBO);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, coneCoords);
+
+        // Configuração de transparência (Blend aditivo) e desativação da escrita no Z-buffer
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.depthMask(false);
+
+        gl.useProgram(coneProgram);
+        gl.uniformMatrix4fv(coneLocations.uProjectionMatrix, false, projMatrix);
+        gl.uniformMatrix4fv(coneLocations.uViewMatrix, false, viewMatrix);
+        gl.uniform3fv(coneLocations.uConeColor, [0.0, 0.8, 0.2]); // Verde Jade translúcido
+
+        gl.bindVertexArray(coneVAO);
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, N + 2);
+        gl.bindVertexArray(null);
+
+        // Restaurar estado do WebGL
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
     }
 
     initGame();
