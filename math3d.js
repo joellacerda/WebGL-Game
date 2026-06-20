@@ -121,6 +121,45 @@ const Mat4 = {
         return out;
     },
 
+    rotationX: function(out, rad) {
+        const c = Math.cos(rad);
+        const s = Math.sin(rad);
+        out.fill(0);
+        out[0] = 1;
+        out[5] = c;
+        out[6] = s;
+        out[9] = -s;
+        out[10] = c;
+        out[15] = 1;
+        return out;
+    },
+
+    rotationY: function(out, rad) {
+        const c = Math.cos(rad);
+        const s = Math.sin(rad);
+        out.fill(0);
+        out[0] = c;
+        out[2] = -s;
+        out[5] = 1;
+        out[8] = s;
+        out[10] = c;
+        out[15] = 1;
+        return out;
+    },
+
+    rotationZ: function(out, rad) {
+        const c = Math.cos(rad);
+        const s = Math.sin(rad);
+        out.fill(0);
+        out[0] = c;
+        out[1] = s;
+        out[4] = -s;
+        out[5] = c;
+        out[10] = 1;
+        out[15] = 1;
+        return out;
+    },
+
     perspective: function(out, fovY, aspect, near, far) {
         const f = 1.0 / Math.tan(fovY / 2.0);
         const nf = 1.0 / (near - far);

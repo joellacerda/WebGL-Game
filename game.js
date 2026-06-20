@@ -53,11 +53,16 @@ window.addEventListener("DOMContentLoaded", () => {
     const cameraPos = Vec3.create(mazeScale * 0.15, 0.25, mazeScale * 0.15); // Inicializa no centro do labirinto (ajustado no validate)
     const cameraFront = Vec3.create(0.0, 0.0, -1.0);
     const cameraUp = Vec3.create(0.0, 1.0, 0.0);
+    const mazeWorldSize = mazeScale * 0.3;
+    const mazeWorldCenter = mazeWorldSize * 0.5;
+    const overviewCameraPos = Vec3.create(mazeWorldCenter, 20.0, mazeWorldCenter + 6.0);
+    const overviewTarget = Vec3.create(mazeWorldCenter, 0.0, mazeWorldCenter);
 
     let yaw = -90.0;
     let pitch = 0.0;
     const keys = { W: false, A: false, S: false, D: false };
     let isLightOn = true;
+    let isOverviewMode = false;
     const mouseSensitivity = 0.15;
     const movementSpeed = 1.8;           // Reduzido para movimentação mais lenta e atmosférica
 
@@ -75,6 +80,13 @@ window.addEventListener("DOMContentLoaded", () => {
         if (k === "L") {
             isLightOn = !isLightOn;
             console.log(`Lanterna: ${isLightOn ? "LIGADA" : "DESLIGADA"}`);
+        }
+        if (k === "O") {
+            isOverviewMode = !isOverviewMode;
+            if (isOverviewMode && document.pointerLockElement === canvas) {
+                document.exitPointerLock();
+            }
+            console.log(`Modo de visão geral: ${isOverviewMode ? "ATIVADO" : "DESATIVADO"}`);
         }
     });
 
@@ -148,6 +160,9 @@ window.addEventListener("DOMContentLoaded", () => {
     uniform vec3 uEyePos;        // Posição do Olho de Jade (Luz 2)
     uniform vec3 uEyeDir;        // Direção do feixe do Olho de Jade
     uniform vec3 uLight2Color;   // Cor do feixe do Olho de Jade (Verde)
+
+    uniform vec3 uFlamePos;      // Posição da chama azul do Cálice (Luz 3)
+    uniform vec3 uFlameColor;    // Cor da chama azul (Luz 3)
 
     uniform float uShininess;
     uniform vec3 uSpecularColor;
@@ -230,8 +245,23 @@ window.addEventListener("DOMContentLoaded", () => {
 
         vec3 light2Contribution = (diff2 * baseColor + spec2 * specColorMat) * uLight2Color * intensity2 * atten2;
 
+        // --- LUZ 3: CHAMA AZUL DO CÁLICE (Point light local azul) ---
+        vec3 light3Dir = normalize(uFlamePos - vWorldPos);
+        float dist3 = length(uFlamePos - vWorldPos);
+        float flameRange = 2.3;
+        float flameFade = 1.0 - smoothstep(flameRange * 0.55, flameRange, dist3);
+        float atten3 = flameFade / (1.0 + 0.65 * dist3 + 0.45 * dist3 * dist3);
+
+        // Difusa e Especular de Phong com brilho azul mais contido nas paredes
+        float diff3 = max(dot(normal, light3Dir), 0.0);
+        vec3 reflectDir3 = reflect(-light3Dir, normal);
+        float spec3 = pow(max(dot(viewDir, reflectDir3), 0.0), shininessMat);
+        float flameSpecStrength = abs(normal.y) > 0.8 ? 0.14 : 0.03;
+
+        vec3 light3Contribution = (diff3 * baseColor + spec3 * specColorMat * flameSpecStrength) * uFlameColor * atten3;
+
         // --- MODELO DE REFLEXÃO DE PHONG COMPLETO (Soma dos termos) ---
-        vec3 finalColor = ambient + light1Contribution + light2Contribution;
+        vec3 finalColor = ambient + light1Contribution + light2Contribution + light3Contribution;
         fragColor = vec4(finalColor, 1.0);
     }`;
 
@@ -256,6 +286,162 @@ window.addEventListener("DOMContentLoaded", () => {
         // Efeito volumétrico: mais brilhante no topo (perto do olho) e mais suave embaixo
         float alpha = mix(0.03, 0.22, vHeightFactor);
         fragColor = vec4(uConeColor, alpha);
+     }`;
+
+    // --- SHADERS DO MARCADOR DO JOGADOR (Visão geral) ---
+    const markerVSSource = `#version 300 es
+    in vec3 aPosition;
+    uniform mat4 uProjectionMatrix;
+    uniform mat4 uViewMatrix;
+    uniform float uMarkerSize;
+    void main() {
+        gl_Position = uProjectionMatrix * uViewMatrix * vec4(aPosition, 1.0);
+        gl_PointSize = uMarkerSize;
+    }`;
+
+    const markerFSSource = `#version 300 es
+    precision highp float;
+    uniform vec3 uMarkerColor;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_PointCoord * 2.0 - 1.0;
+        float dist = dot(coord, coord);
+        if (dist > 1.0) discard;
+
+        float ring = smoothstep(0.95, 0.55, dist) - smoothstep(0.55, 0.22, dist);
+        float core = 1.0 - smoothstep(0.0, 0.18, dist);
+        float alpha = max(ring * 0.95, core * 0.8);
+        vec3 color = mix(uMarkerColor, vec3(1.0, 1.0, 1.0), core * 0.65);
+        fragColor = vec4(color, alpha);
+    }`;
+
+    // --- SHADERS DO CÁLICE DE FOGO (Material Dourado/Metálico) ---
+    const gobletVSSource = `#version 300 es
+    in vec3 aPosition;
+    in vec3 aNormal;
+    out vec3 vWorldPos;
+    out vec3 vNormal;
+    out float vHeight;
+    uniform mat4 uProjectionMatrix;
+    uniform mat4 uViewMatrix;
+    uniform mat4 uGobletModelMatrix;
+    void main() {
+        vec4 worldPos = uGobletModelMatrix * vec4(aPosition, 1.0);
+        vWorldPos = worldPos.xyz;
+        vNormal = normalize(mat3(uGobletModelMatrix) * aNormal);
+        vHeight = aPosition.y;
+        gl_Position = uProjectionMatrix * uViewMatrix * worldPos;
+    }`;
+
+    const gobletFSSource = `#version 300 es
+    precision highp float;
+    in vec3 vWorldPos;
+    in vec3 vNormal;
+    in float vHeight;
+    out vec4 fragColor;
+
+    uniform vec3 uCameraPos;
+    uniform vec3 uCameraFront;
+    uniform vec3 uLight1Color;
+    uniform vec3 uEyePos;
+    uniform vec3 uEyeDir;
+    uniform vec3 uLight2Color;
+    uniform float uTime;
+
+    void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(uCameraPos - vWorldPos);
+
+        // Material dourado metálico com gradiente
+        vec3 goldBase = vec3(0.83, 0.69, 0.22);   // Ouro base
+        vec3 goldBright = vec3(1.0, 0.84, 0.35);   // Ouro brilhante
+        vec3 goldDark = vec3(0.55, 0.38, 0.08);    // Ouro escuro
+
+        // Gradiente vertical: base mais escura, borda do copo mais clara
+        float heightFactor = clamp(vHeight / 1.45, 0.0, 1.0);
+        vec3 baseColor = mix(goldDark, goldBright, heightFactor);
+
+        // Efeito Fresnel metálico (mais reflexivo nas bordas)
+        float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+        baseColor = mix(baseColor, goldBright * 1.3, fresnel * 0.5);
+
+        // Ambiente — brilho mínimo dourado para o cálice nunca ficar totalmente escuro
+        vec3 ambient = vec3(0.15, 0.12, 0.04) * baseColor;
+
+        // --- LUZ 1: LANTERNA DO JOGADOR ---
+        vec3 light1Dir = normalize(uCameraPos - vWorldPos);
+        float dist1 = length(uCameraPos - vWorldPos);
+        float atten1 = 1.0 / (1.0 + 0.02 * dist1 + 0.01 * dist1 * dist1);
+        float spotEffect1 = dot(normalize(uCameraFront), -light1Dir);
+        float intensity1 = smoothstep(0.85, 0.93, spotEffect1);
+        float diff1 = max(dot(normal, light1Dir), 0.0);
+        vec3 reflectDir1 = reflect(-light1Dir, normal);
+        float spec1 = pow(max(dot(viewDir, reflectDir1), 0.0), 80.0);
+        vec3 light1Contribution = (diff1 * baseColor + spec1 * goldBright * 1.5) * uLight1Color * intensity1 * atten1;
+
+        // --- LUZ 2: OLHO DE JADE ---
+        vec3 light2Dir = normalize(uEyePos - vWorldPos);
+        float dist2 = length(uEyePos - vWorldPos);
+        float atten2 = 1.0 / (1.0 + 0.005 * dist2 + 0.002 * dist2 * dist2);
+        float spotEffect2 = dot(normalize(uEyeDir), -light2Dir);
+        float intensity2 = smoothstep(0.93, 0.97, spotEffect2);
+        float diff2 = max(dot(normal, light2Dir), 0.0);
+        vec3 reflectDir2 = reflect(-light2Dir, normal);
+        float spec2 = pow(max(dot(viewDir, reflectDir2), 0.0), 80.0);
+        vec3 light2Contribution = (diff2 * baseColor + spec2 * goldBright) * uLight2Color * intensity2 * atten2;
+
+        // --- REFLEXO SUTIL DA CHAMA AZUL NA BORDA INTERNA DO COPO ---
+        // Apenas a borda interna do copo (vHeight > 1.1) recebe um leve brilho azulado
+        // Isso mantém o aspecto metálico dourado em toda a superfície
+        float flameReflect = smoothstep(1.1, 1.45, vHeight);
+        float flameFlicker = 0.85 + 0.15 * sin(uTime * 8.0 + vWorldPos.x * 5.0);
+        vec3 flameGlow = vec3(0.08, 0.18, 0.5) * flameReflect * flameFlicker * 0.35;
+
+        vec3 finalColor = ambient + light1Contribution + light2Contribution + flameGlow;
+        fragColor = vec4(finalColor, 1.0);
+    }`;
+
+    // --- SHADERS DO SISTEMA DE PARTÍCULAS (Chama Azul Mística) ---
+    const particleVSSource = `#version 300 es
+    in vec3 aPosition;
+    in float aAge;
+    in float aLife;
+    in float aSize;
+    out float vAgeFactor;
+    uniform mat4 uProjectionMatrix;
+    uniform mat4 uViewMatrix;
+    void main() {
+        vAgeFactor = clamp(aAge / aLife, 0.0, 1.0);
+        vec4 viewPos = uViewMatrix * vec4(aPosition, 1.0);
+        gl_Position = uProjectionMatrix * viewPos;
+        // Tamanho da partícula diminui com a distância e com a idade
+        float dist = length(viewPos.xyz);
+        gl_PointSize = aSize * (1.0 - vAgeFactor * 0.6) * (300.0 / max(dist, 1.0));
+    }`;
+
+    const particleFSSource = `#version 300 es
+    precision highp float;
+    in float vAgeFactor;
+    out vec4 fragColor;
+    void main() {
+        // Partícula circular suave (descarta cantos do quad)
+        vec2 coord = gl_PointCoord * 2.0 - 1.0;
+        float dist = dot(coord, coord);
+        if (dist > 1.0) discard;
+        float softEdge = 1.0 - smoothstep(0.3, 1.0, dist);
+
+        // Gradiente de cor: azul brilhante → ciano → branco no centro, fade com idade
+        vec3 coreColor = vec3(0.7, 0.85, 1.0);              // Branco-azulado (núcleo)
+        vec3 midColor = vec3(0.1, 0.45, 1.0);               // Azul intenso
+        vec3 outerColor = vec3(0.05, 0.15, 0.6);             // Azul escuro
+
+        // Mistura baseada na distância do centro da partícula
+        vec3 color = mix(coreColor, midColor, smoothstep(0.0, 0.5, dist));
+        color = mix(color, outerColor, smoothstep(0.5, 1.0, dist));
+
+        // Alpha: forte no início, desaparece com a idade
+        float alpha = softEdge * (1.0 - vAgeFactor) * 0.85;
+        fragColor = vec4(color, alpha);
     }`;
 
     let shaderProgram;
@@ -264,6 +450,22 @@ window.addEventListener("DOMContentLoaded", () => {
     let floorMesh = null;
     let isLoaded = false;
     let wallSegments = new Float32Array(0);
+    let gameTime = 0.0;
+
+    // --- Variáveis do Cálice de Fogo ---
+    let gobletProgram;
+    let gobletLocations = {};
+    let gobletMesh = null;
+    let particleProgram;
+    let particleLocations = {};
+    let particleSystem = null;
+    const gobletModelMatrix = Mat4.create();
+    const gobletTempMatrix = Mat4.create();
+    const gobletRotMatrix = Mat4.create();
+    const gobletCombined = Mat4.create();
+    // Posição do cálice no mundo (será ajustada após validar posição do jogador)
+    const gobletWorldPos = Vec3.create(0, 0, 0);
+    const gobletScale = 0.315; // Escala do cálice no mundo (~30% menor)
 
     let wallAlbedoTexture;
     let wallRoughnessTexture;
@@ -272,6 +474,9 @@ window.addEventListener("DOMContentLoaded", () => {
     let coneProgram;
     let coneLocations = {};
     let coneVAO, coneVBO;
+    let markerProgram;
+    let markerLocations = {};
+    let markerVAO, markerVBO;
 
     function compileShader(gl, source, type) {
         const shader = gl.createShader(type);
@@ -344,6 +549,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 uLight2Color: gl.getUniformLocation(shaderProgram, "uLight2Color"),
                 uShininess: gl.getUniformLocation(shaderProgram, "uShininess"),
                 uSpecularColor: gl.getUniformLocation(shaderProgram, "uSpecularColor"),
+                uFlamePos: gl.getUniformLocation(shaderProgram, "uFlamePos"),
+                uFlameColor: gl.getUniformLocation(shaderProgram, "uFlameColor"),
                 uAlbedoMap: gl.getUniformLocation(shaderProgram, "uAlbedoMap"),
                 uRoughnessMap: gl.getUniformLocation(shaderProgram, "uRoughnessMap"),
                 uGroundAlbedoMap: gl.getUniformLocation(shaderProgram, "uGroundAlbedoMap"),
@@ -452,8 +659,95 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.vertexAttribPointer(coneLocations.aPosition, 3, gl.FLOAT, false, 0, 0);
             gl.bindVertexArray(null);
 
+            markerProgram = createProgram(gl, markerVSSource, markerFSSource);
+            markerLocations = {
+                aPosition: gl.getAttribLocation(markerProgram, "aPosition"),
+                uProjectionMatrix: gl.getUniformLocation(markerProgram, "uProjectionMatrix"),
+                uViewMatrix: gl.getUniformLocation(markerProgram, "uViewMatrix"),
+                uMarkerColor: gl.getUniformLocation(markerProgram, "uMarkerColor"),
+                uMarkerSize: gl.getUniformLocation(markerProgram, "uMarkerSize")
+            };
+
+            markerVAO = gl.createVertexArray();
+            markerVBO = gl.createBuffer();
+            gl.bindVertexArray(markerVAO);
+            gl.bindBuffer(gl.ARRAY_BUFFER, markerVBO);
+            gl.bufferData(gl.ARRAY_BUFFER, 3 * 4, gl.DYNAMIC_DRAW);
+            gl.enableVertexAttribArray(markerLocations.aPosition);
+            gl.vertexAttribPointer(markerLocations.aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindVertexArray(null);
+
             extractWallSegments();
             validateStartPosition();
+
+            // --- INICIALIZAR CÁLICE DE FOGO ---
+            if (loaderText) loaderText.textContent = "Criando Cálice de Fogo...";
+
+            // Compilar shaders do Cálice
+            gobletProgram = createProgram(gl, gobletVSSource, gobletFSSource);
+            gobletLocations = {
+                aPosition: gl.getAttribLocation(gobletProgram, "aPosition"),
+                aNormal: gl.getAttribLocation(gobletProgram, "aNormal"),
+                uProjectionMatrix: gl.getUniformLocation(gobletProgram, "uProjectionMatrix"),
+                uViewMatrix: gl.getUniformLocation(gobletProgram, "uViewMatrix"),
+                uGobletModelMatrix: gl.getUniformLocation(gobletProgram, "uGobletModelMatrix"),
+                uCameraPos: gl.getUniformLocation(gobletProgram, "uCameraPos"),
+                uCameraFront: gl.getUniformLocation(gobletProgram, "uCameraFront"),
+                uLight1Color: gl.getUniformLocation(gobletProgram, "uLight1Color"),
+                uEyePos: gl.getUniformLocation(gobletProgram, "uEyePos"),
+                uEyeDir: gl.getUniformLocation(gobletProgram, "uEyeDir"),
+                uLight2Color: gl.getUniformLocation(gobletProgram, "uLight2Color"),
+                uTime: gl.getUniformLocation(gobletProgram, "uTime")
+            };
+
+            // Gerar geometria procedural do Cálice
+            gobletMesh = GobletGenerator.generateGobletMesh(gl);
+            console.log("Cálice de Fogo criado com sucesso.", gobletMesh);
+
+            // Posicionar o Cálice em um ponto aleatório do labirinto, longe das paredes e do jogador.
+            {
+                let gobletPlaced = false;
+                const minDistanceFromPlayer = 4.5;
+                const gobletClearRadius = 0.32;
+                const randomSpawn = findRandomClearPosition(minDistanceFromPlayer, gobletClearRadius);
+
+                if (randomSpawn) {
+                    Vec3.set(gobletWorldPos, randomSpawn[0], 0.0, randomSpawn[1]);
+                    gobletPlaced = true;
+                }
+
+                if (!gobletPlaced) {
+                    console.warn("Não foi possível sortear uma posição aleatória segura para o Cálice. Usando fallback próximo ao jogador.");
+                    for (let dist = 2.5; dist <= 6.0 && !gobletPlaced; dist += 0.5) {
+                        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+                            const testX = cameraPos[0] + Math.cos(angle) * dist;
+                            const testZ = cameraPos[2] + Math.sin(angle) * dist;
+                            if (!isPositionClear(testX, testZ, gobletClearRadius)) continue;
+
+                            Vec3.set(gobletWorldPos, testX, 0.0, testZ);
+                            gobletPlaced = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!gobletPlaced) {
+                    Vec3.set(gobletWorldPos, cameraPos[0], 0.0, cameraPos[2]);
+                }
+            }
+            console.log("Cálice posicionado em:", gobletWorldPos);
+
+            // Compilar shaders das Partículas
+            particleProgram = createProgram(gl, particleVSSource, particleFSSource);
+            particleLocations = {
+                uProjectionMatrix: gl.getUniformLocation(particleProgram, "uProjectionMatrix"),
+                uViewMatrix: gl.getUniformLocation(particleProgram, "uViewMatrix")
+            };
+
+            // Criar Sistema de Partículas (Chama Azul)
+            particleSystem = new ParticleSystem(120);
+            particleSystem.initWebGL(gl, particleProgram);
+            console.log("Sistema de Partículas (Chama Azul) inicializado.");
 
             isLoaded = true;
             if (loader) {
@@ -549,6 +843,54 @@ window.addEventListener("DOMContentLoaded", () => {
         return false;
     }
 
+    function isPositionClear(x, z, radius) {
+        if (checkCollision(x, z)) return false;
+
+        const samples = [
+            [radius, 0.0],
+            [-radius, 0.0],
+            [0.0, radius],
+            [0.0, -radius],
+            [radius * 0.7, radius * 0.7],
+            [radius * 0.7, -radius * 0.7],
+            [-radius * 0.7, radius * 0.7],
+            [-radius * 0.7, -radius * 0.7]
+        ];
+
+        for (const sample of samples) {
+            if (checkCollision(x + sample[0], z + sample[1])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function findRandomClearPosition(minDistanceFromPlayer, clearRadius) {
+        const minCoord = 1.0;
+        const maxCoord = mazeWorldSize - 1.0;
+        const step = 0.35;
+        const minDistanceSq = minDistanceFromPlayer * minDistanceFromPlayer;
+        const validPoints = [];
+
+        for (let x = minCoord; x <= maxCoord; x += step) {
+            for (let z = minCoord; z <= maxCoord; z += step) {
+                const dx = x - cameraPos[0];
+                const dz = z - cameraPos[2];
+                if (dx * dx + dz * dz < minDistanceSq) continue;
+                if (!isPositionClear(x, z, clearRadius)) continue;
+                validPoints.push([x, z]);
+            }
+        }
+
+        if (validPoints.length === 0) {
+            return null;
+        }
+
+        const choice = validPoints[Math.floor(Math.random() * validPoints.length)];
+        return choice;
+    }
+
     // Valida e reposiciona o jogador de forma segura caso ele nasça dentro de uma parede
     function validateStartPosition() {
         if (checkCollision(cameraPos[0], cameraPos[2])) {
@@ -599,6 +941,7 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        gameTime += deltaTime;
         update(deltaTime);
         render();
         requestAnimationFrame(gameLoop);
@@ -607,28 +950,30 @@ window.addEventListener("DOMContentLoaded", () => {
     const frontProj = Vec3.create();
     const rightVec = Vec3.create();
     function update(dt) {
-        const moveSpeed = movementSpeed * dt;
-        Vec3.set(frontProj, cameraFront[0], 0, cameraFront[2]);
-        Vec3.normalize(frontProj, frontProj);
-        Vec3.cross(rightVec, cameraFront, cameraUp);
-        Vec3.normalize(rightVec, rightVec);
+        if (!isOverviewMode) {
+            const moveSpeed = movementSpeed * dt;
+            Vec3.set(frontProj, cameraFront[0], 0, cameraFront[2]);
+            Vec3.normalize(frontProj, frontProj);
+            Vec3.cross(rightVec, cameraFront, cameraUp);
+            Vec3.normalize(rightVec, rightVec);
 
-        let dx = 0, dz = 0;
-        if (keys.W) { dx += frontProj[0] * moveSpeed; dz += frontProj[2] * moveSpeed; }
-        if (keys.S) { dx -= frontProj[0] * moveSpeed; dz -= frontProj[2] * moveSpeed; }
-        if (keys.D) { dx += rightVec[0] * moveSpeed; dz += rightVec[2] * moveSpeed; }
-        if (keys.A) { dx -= rightVec[0] * moveSpeed; dz -= rightVec[2] * moveSpeed; }
+            let dx = 0, dz = 0;
+            if (keys.W) { dx += frontProj[0] * moveSpeed; dz += frontProj[2] * moveSpeed; }
+            if (keys.S) { dx -= frontProj[0] * moveSpeed; dz -= frontProj[2] * moveSpeed; }
+            if (keys.D) { dx += rightVec[0] * moveSpeed; dz += rightVec[2] * moveSpeed; }
+            if (keys.A) { dx -= rightVec[0] * moveSpeed; dz -= rightVec[2] * moveSpeed; }
 
-        const steps = 4;
-        const subDx = dx / steps;
-        const subDz = dz / steps;
+            const steps = 4;
+            const subDx = dx / steps;
+            const subDz = dz / steps;
 
-        for (let i = 0; i < steps; i++) {
-            if (!checkCollision(cameraPos[0] + subDx, cameraPos[2])) {
-                cameraPos[0] += subDx;
-            }
-            if (!checkCollision(cameraPos[0], cameraPos[2] + subDz)) {
-                cameraPos[2] += subDz;
+            for (let i = 0; i < steps; i++) {
+                if (!checkCollision(cameraPos[0] + subDx, cameraPos[2])) {
+                    cameraPos[0] += subDx;
+                }
+                if (!checkCollision(cameraPos[0], cameraPos[2] + subDz)) {
+                    cameraPos[2] += subDz;
+                }
             }
         }
 
@@ -654,6 +999,15 @@ window.addEventListener("DOMContentLoaded", () => {
         Vec3.subtract(eyeDir, eyeTarget, eyePos);
         Vec3.normalize(eyeDir, eyeDir);
 
+        // --- Atualizar Sistema de Partículas do Cálice ---
+        if (particleSystem) {
+            // A origem das partículas é a boca do cálice (topo da geometria, Y=1.45 * gobletScale)
+            // + flutuação vertical sincronizada com a animação do render
+            const floatY = 0.18 + Math.sin(gameTime * 2.2) * 0.06;
+            const flameOriginY = floatY + 1.35 * gobletScale;
+            particleSystem.update(dt, [gobletWorldPos[0], flameOriginY, gobletWorldPos[2]]);
+        }
+
         document.getElementById("statPos").textContent = `[${cameraPos[0].toFixed(1)}, ${cameraPos[1].toFixed(1)}, ${cameraPos[2].toFixed(1)}]`;
     }
 
@@ -662,20 +1016,30 @@ window.addEventListener("DOMContentLoaded", () => {
     const modelMatrix = Mat4.create();
     const lookAtTarget = Vec3.create();
     const lookAtDir = Vec3.create();
+    const activeCameraPos = Vec3.create();
+    const activeCameraTarget = Vec3.create();
     const specColor = Vec3.create(1.0, 1.0, 1.0); // Cor de brilho especular branco
 
     function render() {
         if (!isLoaded) return;
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         const aspect = gl.canvas.width / gl.canvas.height;
-        
-        Mat4.perspective(projMatrix, Math.PI / 3, aspect, 0.1, 1000.0);
-        
-        Vec3.set(lookAtDir, -cameraFront[0], -cameraFront[1], -cameraFront[2]);
-        Vec3.normalize(lookAtDir, lookAtDir);
-        Vec3.subtract(lookAtTarget, cameraPos, lookAtDir);
-        
-        Mat4.lookAt(viewMatrix, cameraPos, lookAtTarget, cameraUp);
+        const fov = isOverviewMode ? Math.PI / 2.6 : Math.PI / 3;
+
+        Mat4.perspective(projMatrix, fov, aspect, 0.1, 1000.0);
+
+        if (isOverviewMode) {
+            Vec3.set(activeCameraPos, overviewCameraPos[0], overviewCameraPos[1], overviewCameraPos[2]);
+            Vec3.set(activeCameraTarget, overviewTarget[0], overviewTarget[1], overviewTarget[2]);
+        } else {
+            Vec3.set(lookAtDir, -cameraFront[0], -cameraFront[1], -cameraFront[2]);
+            Vec3.normalize(lookAtDir, lookAtDir);
+            Vec3.subtract(lookAtTarget, cameraPos, lookAtDir);
+            Vec3.set(activeCameraPos, cameraPos[0], cameraPos[1], cameraPos[2]);
+            Vec3.set(activeCameraTarget, lookAtTarget[0], lookAtTarget[1], lookAtTarget[2]);
+        }
+
+        Mat4.lookAt(viewMatrix, activeCameraPos, activeCameraTarget, cameraUp);
         Mat4.scale(modelMatrix, mazeScale, mazeScale * wallHeightMultiplier, mazeScale);
 
         gl.useProgram(shaderProgram);
@@ -684,7 +1048,7 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.uniformMatrix4fv(locations.uModelMatrix, false, modelMatrix);
         
         // Dados da Câmera
-        gl.uniform3fv(locations.uCameraPos, cameraPos);
+        gl.uniform3fv(locations.uCameraPos, activeCameraPos);
         gl.uniform3fv(locations.uCameraFront, cameraFront);
         
         // Luz 1: Lanterna do Jogador (Branca/Amarelada)
@@ -696,6 +1060,15 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.uniform3fv(locations.uEyePos, eyePos);
         gl.uniform3fv(locations.uEyeDir, eyeDir);
         gl.uniform3fv(locations.uLight2Color, light2Color);
+
+        // Luz 3: Chama Azul do Cálice (Point Light que se projeta nas paredes e chão)
+        {
+            const floatY = 0.18 + Math.sin(gameTime * 2.2) * 0.06;
+            const flameY = floatY + 1.35 * gobletScale;
+            const flicker = 0.85 + 0.15 * Math.sin(gameTime * 18.0) + 0.08 * Math.sin(gameTime * 33.0);
+            gl.uniform3fv(locations.uFlamePos, [gobletWorldPos[0], flameY, gobletWorldPos[2]]);
+            gl.uniform3fv(locations.uFlameColor, [0.05 * flicker, 0.35 * flicker, 1.0 * flicker]);
+        }
 
         // Parâmetros de Especularidade (Modelo de Phong completo)
         gl.uniform1f(locations.uShininess, 32.0);
@@ -771,6 +1144,82 @@ window.addEventListener("DOMContentLoaded", () => {
         // Restaurar estado do WebGL
         gl.depthMask(true);
         gl.disable(gl.BLEND);
+
+        // --- DESENHAR CÁLICE DE FOGO ---
+        if (gobletMesh && gobletProgram) {
+            // Animação: flutuação vertical + rotação contínua (igual ao preview)
+            const floatY = 0.18 + Math.sin(gameTime * 2.2) * 0.06;
+            const rotationY = gameTime * 0.85;
+
+            // Construir model matrix: Translate → Rotation → Scale
+            Mat4.translation(gobletModelMatrix, gobletWorldPos[0], floatY, gobletWorldPos[2]);
+            Mat4.rotationY(gobletRotMatrix, rotationY);
+            Mat4.scale(gobletTempMatrix, gobletScale, gobletScale, gobletScale);
+            Mat4.multiply(gobletCombined, gobletModelMatrix, gobletRotMatrix);
+            Mat4.multiply(gobletModelMatrix, gobletCombined, gobletTempMatrix);
+
+            gl.useProgram(gobletProgram);
+            gl.uniformMatrix4fv(gobletLocations.uProjectionMatrix, false, projMatrix);
+            gl.uniformMatrix4fv(gobletLocations.uViewMatrix, false, viewMatrix);
+            gl.uniformMatrix4fv(gobletLocations.uGobletModelMatrix, false, gobletModelMatrix);
+            gl.uniform3fv(gobletLocations.uCameraPos, activeCameraPos);
+            gl.uniform3fv(gobletLocations.uCameraFront, cameraFront);
+
+            const gobletLight1 = isLightOn ? [1.0, 0.95, 0.85] : [0.0, 0.0, 0.0];
+            gl.uniform3fv(gobletLocations.uLight1Color, gobletLight1);
+            gl.uniform3fv(gobletLocations.uEyePos, eyePos);
+            gl.uniform3fv(gobletLocations.uEyeDir, eyeDir);
+            gl.uniform3fv(gobletLocations.uLight2Color, light2Color);
+            gl.uniform1f(gobletLocations.uTime, gameTime);
+
+            // O cálice precisa renderizar frente e verso por causa do interior do copo
+            gl.disable(gl.CULL_FACE);
+            gl.bindVertexArray(gobletMesh.vao);
+            gl.drawElements(gl.TRIANGLES, gobletMesh.count, gobletMesh.indexType, 0);
+            gl.bindVertexArray(null);
+            gl.enable(gl.CULL_FACE);
+        }
+
+        // --- DESENHAR PARTÍCULAS DA CHAMA AZUL ---
+        if (particleSystem && particleProgram) {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Blend aditivo para brilho
+            gl.depthMask(false); // Não escrever no Z-buffer (translúcido)
+
+            gl.useProgram(particleProgram);
+            gl.uniformMatrix4fv(particleLocations.uProjectionMatrix, false, projMatrix);
+            gl.uniformMatrix4fv(particleLocations.uViewMatrix, false, viewMatrix);
+
+            particleSystem.draw(gl, particleProgram);
+
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+        }
+
+        if (isOverviewMode && markerProgram && markerVAO) {
+            const markerPos = new Float32Array([cameraPos[0], 1.55, cameraPos[2]]);
+            const markerSize = Math.min(gl.canvas.width, gl.canvas.height) * 0.045;
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, markerVBO);
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, markerPos);
+
+            gl.disable(gl.DEPTH_TEST);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            gl.useProgram(markerProgram);
+            gl.uniformMatrix4fv(markerLocations.uProjectionMatrix, false, projMatrix);
+            gl.uniformMatrix4fv(markerLocations.uViewMatrix, false, viewMatrix);
+            gl.uniform3fv(markerLocations.uMarkerColor, [1.0, 0.15, 0.15]);
+            gl.uniform1f(markerLocations.uMarkerSize, markerSize);
+
+            gl.bindVertexArray(markerVAO);
+            gl.drawArrays(gl.POINTS, 0, 1);
+            gl.bindVertexArray(null);
+
+            gl.disable(gl.BLEND);
+            gl.enable(gl.DEPTH_TEST);
+        }
     }
 
     initGame();
