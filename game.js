@@ -50,15 +50,15 @@ window.addEventListener("DOMContentLoaded", () => {
     const wallHeightMultiplier = 1.2;    // Ajustado para manter a altura física das paredes em ~1.77 unidades
 
     // Câmera do Jogador
-    const cameraPos = Vec3.create(mazeScale * 0.15, 0.25, mazeScale * 0.15); // Inicializa no centro do labirinto (ajustado no validate)
-    const cameraFront = Vec3.create(0.0, 0.0, -1.0);
+    const cameraPos = Vec3.create(20.0, 0.3, 7.0); // Posição inicial fora do labirinto
+    const cameraFront = Vec3.create(-1.0, 0.0, 0.0); // Apontando para o oeste (inicialmente leste, girado 180 graus)
     const cameraUp = Vec3.create(0.0, 1.0, 0.0);
     const mazeWorldSize = mazeScale * 0.3;
     const mazeWorldCenter = mazeWorldSize * 0.5;
     const overviewCameraPos = Vec3.create(mazeWorldCenter, 20.0, mazeWorldCenter + 6.0);
     const overviewTarget = Vec3.create(mazeWorldCenter, 0.0, mazeWorldCenter);
 
-    let yaw = -90.0;
+    let yaw = 180.0;
     let pitch = 0.0;
     const keys = { W: false, A: false, S: false, D: false };
     let isLightOn = true;
@@ -195,8 +195,8 @@ window.addEventListener("DOMContentLoaded", () => {
         float shininessMat;
 
         if (normal.y > 0.8) {
-            // Chão (Floor) — Textura de terreno rochoso
-            baseColor = texture(uGroundAlbedoMap, uv).rgb;
+            // Chão (Floor) — Cor sólida cinza
+            baseColor = vec3(0.35, 0.35, 0.35); // Cinza sólido
             specColorMat = vec3(0.04);                         // Chão rochoso é bem áspero, reflete pouco
             shininessMat = 6.0;
         } else if (normal.y < -0.8) {
@@ -423,6 +423,7 @@ window.addEventListener("DOMContentLoaded", () => {
     precision highp float;
     in float vAgeFactor;
     out vec4 fragColor;
+    uniform int uParticleType;
     void main() {
         // Partícula circular suave (descarta cantos do quad)
         vec2 coord = gl_PointCoord * 2.0 - 1.0;
@@ -430,10 +431,21 @@ window.addEventListener("DOMContentLoaded", () => {
         if (dist > 1.0) discard;
         float softEdge = 1.0 - smoothstep(0.3, 1.0, dist);
 
-        // Gradiente de cor: azul brilhante → ciano → branco no centro, fade com idade
-        vec3 coreColor = vec3(0.7, 0.85, 1.0);              // Branco-azulado (núcleo)
-        vec3 midColor = vec3(0.1, 0.45, 1.0);               // Azul intenso
-        vec3 outerColor = vec3(0.05, 0.15, 0.6);             // Azul escuro
+        vec3 coreColor;
+        vec3 midColor;
+        vec3 outerColor;
+
+        if (uParticleType == 1) {
+            // Fogo Vermelho/Laranja (Saída)
+            coreColor = vec3(1.0, 0.9, 0.65);
+            midColor = vec3(1.0, 0.35, 0.0);
+            outerColor = vec3(0.8, 0.05, 0.0);
+        } else {
+            // Chama Azul Mística (Cálice)
+            coreColor = vec3(0.7, 0.85, 1.0);
+            midColor = vec3(0.1, 0.45, 1.0);
+            outerColor = vec3(0.05, 0.15, 0.6);
+        }
 
         // Mistura baseada na distância do centro da partícula
         vec3 color = mix(coreColor, midColor, smoothstep(0.0, 0.5, dist));
@@ -452,13 +464,16 @@ window.addEventListener("DOMContentLoaded", () => {
     let wallSegments = new Float32Array(0);
     let gameTime = 0.0;
 
-    // --- Variáveis do Cálice de Fogo ---
+    // --- Variáveis do Cálice de Fogo e Regras de Jogo ---
     let gobletProgram;
     let gobletLocations = {};
     let gobletMesh = null;
     let particleProgram;
     let particleLocations = {};
     let particleSystem = null;
+    let exitFireSystem = null;
+    let hasGoblet = false;
+    let isGameOver = false;
     const gobletModelMatrix = Mat4.create();
     const gobletTempMatrix = Mat4.create();
     const gobletRotMatrix = Mat4.create();
@@ -598,18 +613,19 @@ window.addEventListener("DOMContentLoaded", () => {
             // O chão é um quad (2 triângulos) em Y=0 cobrindo toda a área do labirinto.
             // As coordenadas estão no espaço normalizado do OBJ (~0 a 0.31).
             // O model matrix (mazeScale) escalará para o espaço do mundo.
-            const floorExtent = 0.31; // Margem além do bounding box do OBJ (max ~0.303)
+            const floorMin = -0.1;
+            const floorMax = 0.41;
             const floorY = 0.0001;    // Levemente acima de Y=0 para evitar z-fighting com a base das paredes
             // prettier-ignore
             const floorPositions = new Float32Array([
-                // Triângulo 1 (CCW visto de cima: 0,0 → 0.31,0.31 → 0.31,0)
-                0.0,         floorY, 0.0,
-                floorExtent, floorY, floorExtent,
-                floorExtent, floorY, 0.0,
-                // Triângulo 2 (CCW visto de cima: 0,0 → 0,0.31 → 0.31,0.31)
-                0.0,         floorY, 0.0,
-                0.0,         floorY, floorExtent,
-                floorExtent, floorY, floorExtent
+                // Triângulo 1 (CCW visto de cima)
+                floorMin, floorY, floorMin,
+                floorMax, floorY, floorMax,
+                floorMax, floorY, floorMin,
+                // Triângulo 2 (CCW visto de cima)
+                floorMin, floorY, floorMin,
+                floorMin, floorY, floorMax,
+                floorMax, floorY, floorMax
             ]);
             // prettier-ignore
             const floorNormals = new Float32Array([
@@ -680,6 +696,9 @@ window.addEventListener("DOMContentLoaded", () => {
             extractWallSegments();
             validateStartPosition();
 
+            // Atualiza HUD de rotação inicial
+            document.getElementById("statRot").textContent = `${yaw.toFixed(1)}° / ${pitch.toFixed(1)}°`;
+
             // --- INICIALIZAR CÁLICE DE FOGO ---
             if (loaderText) loaderText.textContent = "Criando Cálice de Fogo...";
 
@@ -704,50 +723,44 @@ window.addEventListener("DOMContentLoaded", () => {
             gobletMesh = GobletGenerator.generateGobletMesh(gl);
             console.log("Cálice de Fogo criado com sucesso.", gobletMesh);
 
-            // Posicionar o Cálice em um ponto aleatório do labirinto, longe das paredes e do jogador.
-            {
-                let gobletPlaced = false;
-                const minDistanceFromPlayer = 4.5;
-                const gobletClearRadius = 0.32;
-                const randomSpawn = findRandomClearPosition(minDistanceFromPlayer, gobletClearRadius);
-
-                if (randomSpawn) {
-                    Vec3.set(gobletWorldPos, randomSpawn[0], 0.0, randomSpawn[1]);
-                    gobletPlaced = true;
-                }
-
-                if (!gobletPlaced) {
-                    console.warn("Não foi possível sortear uma posição aleatória segura para o Cálice. Usando fallback próximo ao jogador.");
-                    for (let dist = 2.5; dist <= 6.0 && !gobletPlaced; dist += 0.5) {
-                        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
-                            const testX = cameraPos[0] + Math.cos(angle) * dist;
-                            const testZ = cameraPos[2] + Math.sin(angle) * dist;
-                            if (!isPositionClear(testX, testZ, gobletClearRadius)) continue;
-
-                            Vec3.set(gobletWorldPos, testX, 0.0, testZ);
-                            gobletPlaced = true;
+            // Posicionar o Cálice no centro do labirinto (9.0, 0.0, 9.0)
+            let gobletX = 9.0;
+            let gobletZ = 9.0;
+            if (!isPositionClear(gobletX, gobletZ, 0.5)) {
+                let found = false;
+                for (let r = 0.5; r < 5.0 && !found; r += 0.5) {
+                    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                        const testX = 9.0 + Math.cos(angle) * r;
+                        const testZ = 9.0 + Math.sin(angle) * r;
+                        if (isPositionClear(testX, testZ, 0.5)) {
+                            gobletX = testX;
+                            gobletZ = testZ;
+                            found = true;
                             break;
                         }
                     }
                 }
-
-                if (!gobletPlaced) {
-                    Vec3.set(gobletWorldPos, cameraPos[0], 0.0, cameraPos[2]);
-                }
             }
-            console.log("Cálice posicionado em:", gobletWorldPos);
+            Vec3.set(gobletWorldPos, gobletX, 0.0, gobletZ);
+            console.log("Cálice posicionado no labirinto:", gobletWorldPos);
 
             // Compilar shaders das Partículas
             particleProgram = createProgram(gl, particleVSSource, particleFSSource);
             particleLocations = {
                 uProjectionMatrix: gl.getUniformLocation(particleProgram, "uProjectionMatrix"),
-                uViewMatrix: gl.getUniformLocation(particleProgram, "uViewMatrix")
+                uViewMatrix: gl.getUniformLocation(particleProgram, "uViewMatrix"),
+                uParticleType: gl.getUniformLocation(particleProgram, "uParticleType")
             };
 
             // Criar Sistema de Partículas (Chama Azul)
             particleSystem = new ParticleSystem(120);
             particleSystem.initWebGL(gl, particleProgram);
             console.log("Sistema de Partículas (Chama Azul) inicializado.");
+
+            // Criar Sistema de Partículas (Chama Vermelha de Bloqueio da Saída)
+            exitFireSystem = new ParticleSystem(150);
+            exitFireSystem.initWebGL(gl, particleProgram);
+            console.log("Sistema de Partículas da Saída (Chama Vermelha) inicializado.");
 
             isLoaded = true;
             if (loader) {
@@ -833,6 +846,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     function checkCollision(nx, nz) {
+        // Se o jogador não tem o cálice, a saída (1.0, 1.5) está bloqueada por fogo
+        if (!hasGoblet) {
+            const dx = nx - 1.0;
+            const dz = nz - 1.5;
+            if (dx * dx + dz * dz < 0.64) { // Raio de 0.8 unidades
+                return true;
+            }
+        }
         const radius = 0.2; 
         const radiusSq = radius * radius;
         for (let i = 0; i < wallSegments.length; i += 4) {
@@ -950,6 +971,29 @@ window.addEventListener("DOMContentLoaded", () => {
     const frontProj = Vec3.create();
     const rightVec = Vec3.create();
     function update(dt) {
+        if (isGameOver) return;
+
+        // Verificar coleta do cálice
+        if (!hasGoblet) {
+            const dx = cameraPos[0] - gobletWorldPos[0];
+            const dz = cameraPos[2] - gobletWorldPos[2];
+            const dist = Math.hypot(dx, dz);
+            if (dist < 0.8) {
+                hasGoblet = true;
+                console.log("Cálice de Fogo coletado!");
+                showToast("CÁLICE DE FOGO COLETADO", "A chama da saída foi extinta. O Olho de Jade ficou furioso! Corra para a saída em [1.0, 1.5]!");
+            }
+        } else {
+            // Se coletou o cálice, verifica se chegou à saída (1.0, 1.5) para vencer
+            const dx = cameraPos[0] - 1.0;
+            const dz = cameraPos[2] - 1.5;
+            const dist = Math.hypot(dx, dz);
+            if (dist < 0.8) {
+                triggerWin();
+                return;
+            }
+        }
+
         if (!isOverviewMode) {
             const moveSpeed = movementSpeed * dt;
             Vec3.set(frontProj, cameraFront[0], 0, cameraFront[2]);
@@ -977,35 +1021,44 @@ window.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // Restringir limites físicos da câmera do jogador aos limites do labirinto
-        cameraPos[0] = Math.max(1.0, Math.min(mazeScale * 0.3 - 1.0, cameraPos[0]));
-        cameraPos[2] = Math.max(1.0, Math.min(mazeScale * 0.3 - 1.0, cameraPos[2]));
+        // Restringir limites físicos da câmera do jogador aos limites do labirinto expandido (chão expandido de -6 a 24.6)
+        cameraPos[0] = Math.max(-5.0, Math.min(23.6, cameraPos[0]));
+        cameraPos[2] = Math.max(-5.0, Math.min(23.6, cameraPos[2]));
 
         // Lógica de Movimentação Aleatória e Suave do Feixe do Olho de Jade
         eyeWaypointTimer += dt;
         const distToWp = Math.hypot(eyeTarget[0] - eyeTargetWaypoint[0], eyeTarget[2] - eyeTargetWaypoint[2]);
-        if (eyeWaypointTimer > 12.0 || distToWp < 0.8) {
+        const waypointTimeout = hasGoblet ? 4.0 : 12.0;
+        const waypointArrivalDist = hasGoblet ? 1.5 : 0.8;
+
+        if (eyeWaypointTimer > waypointTimeout || distToWp < waypointArrivalDist) {
             // Sorteia um novo waypoint aleatório dentro do limite espacial do labirinto
             eyeTargetWaypoint[0] = 3.0 + Math.random() * (mazeScale * 0.3 - 6.0);
             eyeTargetWaypoint[2] = 3.0 + Math.random() * (mazeScale * 0.3 - 6.0);
             eyeWaypointTimer = 0.0;
         }
         
-        // Interpola suavemente a posição do feixe (fator de interpolação reduzido de 1.2 para 0.4 para movimento suave e lento)
-        eyeTarget[0] += (eyeTargetWaypoint[0] - eyeTarget[0]) * dt * 0.4;
-        eyeTarget[2] += (eyeTargetWaypoint[2] - eyeTarget[2]) * dt * 0.4;
+        // Interpola suavemente a posição do feixe (fator de interpolação aumentado se o cálice for coletado)
+        const jadeEyeSpeedFactor = hasGoblet ? 1.5 : 0.4;
+        eyeTarget[0] += (eyeTargetWaypoint[0] - eyeTarget[0]) * dt * jadeEyeSpeedFactor;
+        eyeTarget[2] += (eyeTargetWaypoint[2] - eyeTarget[2]) * dt * jadeEyeSpeedFactor;
 
         // Atualiza a direção do feixe de luz do olho (olhando para o alvo no chão)
         Vec3.subtract(eyeDir, eyeTarget, eyePos);
         Vec3.normalize(eyeDir, eyeDir);
 
         // --- Atualizar Sistema de Partículas do Cálice ---
-        if (particleSystem) {
+        if (particleSystem && !hasGoblet) {
             // A origem das partículas é a boca do cálice (topo da geometria, Y=1.45 * gobletScale)
             // + flutuação vertical sincronizada com a animação do render
             const floatY = 0.18 + Math.sin(gameTime * 2.2) * 0.06;
             const flameOriginY = floatY + 1.35 * gobletScale;
             particleSystem.update(dt, [gobletWorldPos[0], flameOriginY, gobletWorldPos[2]]);
+        }
+
+        // --- Atualizar Sistema de Partículas da Saída (Chama Vermelha de Bloqueio) ---
+        if (exitFireSystem && !hasGoblet) {
+            exitFireSystem.update(dt, [1.0, 0.05, 1.5]);
         }
 
         document.getElementById("statPos").textContent = `[${cameraPos[0].toFixed(1)}, ${cameraPos[1].toFixed(1)}, ${cameraPos[2].toFixed(1)}]`;
@@ -1059,7 +1112,8 @@ window.addEventListener("DOMContentLoaded", () => {
         // Luz 2: Olho de Jade (Posição, Direção e Cor)
         gl.uniform3fv(locations.uEyePos, eyePos);
         gl.uniform3fv(locations.uEyeDir, eyeDir);
-        gl.uniform3fv(locations.uLight2Color, light2Color);
+        const currentLight2Color = hasGoblet ? [1.0, 0.05, 0.05] : [light2Color[0], light2Color[1], light2Color[2]];
+        gl.uniform3fv(locations.uLight2Color, currentLight2Color);
 
         // Luz 3: Chama Azul do Cálice (Point Light que se projeta nas paredes e chão)
         {
@@ -1135,7 +1189,8 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.useProgram(coneProgram);
         gl.uniformMatrix4fv(coneLocations.uProjectionMatrix, false, projMatrix);
         gl.uniformMatrix4fv(coneLocations.uViewMatrix, false, viewMatrix);
-        gl.uniform3fv(coneLocations.uConeColor, [0.0, 0.8, 0.2]); // Verde Jade translúcido
+        const currentConeColor = hasGoblet ? [0.9, 0.05, 0.05] : [0.0, 0.8, 0.2];
+        gl.uniform3fv(coneLocations.uConeColor, currentConeColor); // Verde Jade translúcido ou Vermelho do Caçador
 
         gl.bindVertexArray(coneVAO);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, N + 2);
@@ -1146,7 +1201,7 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.disable(gl.BLEND);
 
         // --- DESENHAR CÁLICE DE FOGO ---
-        if (gobletMesh && gobletProgram) {
+        if (gobletMesh && gobletProgram && !hasGoblet) {
             // Animação: flutuação vertical + rotação contínua (igual ao preview)
             const floatY = 0.18 + Math.sin(gameTime * 2.2) * 0.06;
             const rotationY = gameTime * 0.85;
@@ -1180,8 +1235,8 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.enable(gl.CULL_FACE);
         }
 
-        // --- DESENHAR PARTÍCULAS DA CHAMA AZUL ---
-        if (particleSystem && particleProgram) {
+        // --- DESENHAR PARTÍCULAS (CHAMAS) ---
+        if (particleProgram) {
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Blend aditivo para brilho
             gl.depthMask(false); // Não escrever no Z-buffer (translúcido)
@@ -1190,7 +1245,17 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.uniformMatrix4fv(particleLocations.uProjectionMatrix, false, projMatrix);
             gl.uniformMatrix4fv(particleLocations.uViewMatrix, false, viewMatrix);
 
-            particleSystem.draw(gl, particleProgram);
+            // Chama azul do cálice (tipo 0) se o cálice não foi pego
+            if (particleSystem && !hasGoblet) {
+                gl.uniform1i(particleLocations.uParticleType, 0);
+                particleSystem.draw(gl, particleProgram);
+            }
+
+            // Chama vermelha da saída (tipo 1) se o cálice não foi pego
+            if (exitFireSystem && !hasGoblet) {
+                gl.uniform1i(particleLocations.uParticleType, 1);
+                exitFireSystem.draw(gl, particleProgram);
+            }
 
             gl.depthMask(true);
             gl.disable(gl.BLEND);
@@ -1221,6 +1286,42 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.enable(gl.DEPTH_TEST);
         }
     }
+
+    function showToast(title, desc) {
+        const container = document.getElementById("toastContainer");
+        if (!container) return;
+        const toast = document.createElement("div");
+        toast.className = "toast";
+        toast.innerHTML = `
+            <div class="toast-title">${title}</div>
+            <div class="toast-desc">${desc}</div>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = "slideOut 0.3s ease-in forwards";
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+
+    function triggerWin() {
+        if (isGameOver) return;
+        isGameOver = true;
+        
+        // Parar o mouse / release pointer lock
+        if (document.pointerLockElement === canvas) {
+            document.exitPointerLock();
+        }
+        
+        // Exibir tela de vitória
+        const winOverlay = document.getElementById("winOverlay");
+        if (winOverlay) {
+            winOverlay.style.display = "flex";
+        }
+    }
+
+    document.getElementById("restartBtn")?.addEventListener("click", () => {
+        location.reload();
+    });
 
     initGame();
 });

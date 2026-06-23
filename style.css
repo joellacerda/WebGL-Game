@@ -661,3 +661,84 @@ body, html {
         font-size: 1.6rem;
     }
 }
+
+/* ==========================================================================
+   TELA DE VITÓRIA (WIN OVERLAY)
+   ========================================================================== */
+.win-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(5, 5, 8, 0.95);
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+.win-content {
+    text-align: center;
+    max-width: 480px;
+    padding: 40px;
+    border-left: 3px solid var(--color-cyan);
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+}
+
+.win-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: var(--color-cyan);
+    text-shadow: 0 0 15px var(--glow-cyan);
+    margin-bottom: 20px;
+}
+
+.win-text {
+    font-size: 1.0rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: 30px;
+    letter-spacing: 0.5px;
+}
+
+.win-btn {
+    background: transparent;
+    border: 2px solid var(--color-cyan);
+    color: var(--color-cyan);
+    padding: 12px 30px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+}
+
+.win-btn:hover {
+    background: var(--color-cyan);
+    color: var(--bg-dark);
+    box-shadow: 0 0 20px var(--glow-cyan);
+    transform: translateY(-2px);
+}
+
+.win-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideOut {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(120%); opacity: 0; }
+}
+
