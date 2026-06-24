@@ -23,7 +23,7 @@
     <div class="vignette"></div>
 
     <!-- Interface HUD do Desenvolvedor -->
-    <div class="hud-container">
+    <div class="hud-container" style="display: none;">
 
         <!-- Painel de Estatísticas em Tempo Real -->
         <div class="hud-bar-container dev-stats">
@@ -65,11 +65,35 @@
         </div>
     </div>
 
+    <!-- Barra de Vida -->
+    <div id="healthBarContainer" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 400px; height: 20px; background: rgba(0,0,0,0.8); border: 2px solid var(--color-alert); border-radius: 10px; z-index: 100; display: none;">
+        <div id="healthBarFill" style="width: 100%; height: 100%; background: var(--color-alert); border-radius: 6px; box-shadow: 0 0 10px var(--glow-alert); transition: width 0.1s linear;"></div>
+    </div>
+
+    <!-- Menu Inicial (Start Screen) -->
+    <div id="startMenuOverlay" class="win-overlay" style="display: none; z-index: 140;">
+        <div class="win-content glass-panel" style="border-left: 3px solid var(--color-suspense); box-shadow: 0 0 30px rgba(43, 250, 128, 0.2);">
+            <h1 class="win-title crt-glitch" style="color: var(--color-suspense); text-shadow: 0 0 15px var(--glow-suspense);">O LABIRINTO DE JADE</h1>
+            <p class="win-text" style="text-align: left; margin-bottom: 10px;"><b>Objetivo:</b> Existe uma saída bloqueada por labaredas de fogo. Encontre o Cálice de Fogo Azul para desbloqueá-la e escapar!</p>
+            <p class="win-text" style="text-align: left; margin-bottom: 25px;"><b>Perigo:</b> Evite a luz do vigia (Olho de Jade) ou sua sanidade será drenada.<br><br><b>Controles:</b><br>- <b>W A S D</b> para se mover.<br>- <b>Mouse</b> para olhar (clique para travar).<br>- <b>L</b> para alternar a lanterna.</p>
+            <button id="startBtn" class="win-btn" style="border-color: var(--color-suspense); color: var(--color-suspense); box-shadow: 0 0 15px var(--glow-suspense);">INICIAR JOGO</button>
+        </div>
+    </div>
+
+    <!-- Tela de Game Over (Game Over Overlay) -->
+    <div id="gameOverOverlay" class="win-overlay" style="display: none; z-index: 150;">
+        <div class="win-content glass-panel" style="border-left: 3px solid var(--color-alert); box-shadow: 0 0 30px rgba(255, 51, 68, 0.2);">
+            <h1 class="win-title crt-glitch" style="color: var(--color-alert); text-shadow: 0 0 15px var(--glow-alert);">FIM DE JOGO</h1>
+            <p class="win-text">A luz do vigia drenou toda a sua sanidade.</p>
+            <button onclick="location.reload()" class="win-btn" style="border-color: var(--color-alert); color: var(--color-alert); box-shadow: 0 0 15px var(--glow-alert);">TENTAR NOVAMENTE</button>
+        </div>
+    </div>
+
     <!-- Tela de Vitória (Win Screen Overlay) -->
     <div id="winOverlay" class="win-overlay" style="display: none;">
         <div class="win-content glass-panel">
             <h1 class="win-title crt-glitch">VOCÊ ESCAPOU!</h1>
-            <p class="win-text">Com o Cálice de Fogo em mãos, você cruzou os portais de Jade e conquistou sua liberdade.</p>
+            <p class="win-text">Com o Cálice de Fogo em mãos, você dissipou as labaredas e conquistou sua liberdade.</p>
             <button id="restartBtn" class="win-btn">JOGAR NOVAMENTE</button>
         </div>
     </div>

@@ -155,8 +155,10 @@ const GobletGenerator = {
  * Representa o Sistema de Partículas para a Chama de Fogo Azul
  */
 class ParticleSystem {
-    constructor(maxParticles = 100) {
+    constructor(maxParticles = 100, spread = 0.28, friction = 0.94) {
         this.maxParticles = maxParticles;
+        this.spread = spread;
+        this.friction = friction;
         this.particles = [];
         
         // Inicializa o vetor de partículas
@@ -190,10 +192,10 @@ class ParticleSystem {
         p.y = origin[1] + (Math.random() - 0.5) * 0.04;
         p.z = origin[2] + Math.sin(angle) * radius;
 
-        // Velocidade: subida vertical rápida, dispersão lateral pequena
-        p.vx = (Math.random() - 0.5) * 0.28;
+        // Velocidade: subida vertical rápida, dispersão lateral customizável
+        p.vx = (Math.random() - 0.5) * this.spread;
         p.vy = 0.65 + Math.random() * 0.8;
-        p.vz = (Math.random() - 0.5) * 0.28;
+        p.vz = (Math.random() - 0.5) * this.spread;
 
         p.age = 0.0;
         p.life = 0.5 + Math.random() * 0.6;   // Tempo de vida entre 0.5s e 1.1s
@@ -218,9 +220,9 @@ class ParticleSystem {
                 p.y += p.vy * dt;
                 p.z += p.vz * dt;
 
-                // Resfriamento/atrito lateral (faz a chama subir em formato de funil/cone)
-                p.vx *= 0.94;
-                p.vz *= 0.94;
+                // Atrito lateral
+                p.vx *= this.friction;
+                p.vz *= this.friction;
             }
 
             // Copia dados para os Float32Arrays estruturados

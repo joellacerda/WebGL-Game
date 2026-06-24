@@ -58,6 +58,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const overviewCameraPos = Vec3.create(mazeWorldCenter, 20.0, mazeWorldCenter + 6.0);
     const overviewTarget = Vec3.create(mazeWorldCenter, 0.0, mazeWorldCenter);
 
+    let isGameStarted = false;
     let yaw = 180.0;
     let pitch = 0.0;
     const keys = { W: false, A: false, S: false, D: false };
@@ -95,7 +96,19 @@ window.addEventListener("DOMContentLoaded", () => {
         if (k in keys) keys[k] = false;
     });
 
-    canvas.addEventListener("click", () => canvas.requestPointerLock());
+    canvas.addEventListener("click", () => {
+        if (isGameStarted) canvas.requestPointerLock();
+    });
+
+    const startBtn = document.getElementById("startBtn");
+    if (startBtn) {
+        startBtn.addEventListener("click", () => {
+            isGameStarted = true;
+            const startMenu = document.getElementById("startMenuOverlay");
+            if (startMenu) startMenu.style.display = "none";
+            canvas.requestPointerLock();
+        });
+    }
 
     document.addEventListener("pointerlockchange", () => {
         const status = document.getElementById("pointerStatus");
@@ -195,8 +208,8 @@ window.addEventListener("DOMContentLoaded", () => {
         float shininessMat;
 
         if (normal.y > 0.8) {
-            // Chão (Floor) — Cor sólida cinza
-            baseColor = vec3(0.35, 0.35, 0.35); // Cinza sólido
+            // Chão (Floor) — Textura de terreno rochoso
+            baseColor = texture(uGroundAlbedoMap, uv).rgb;
             specColorMat = vec3(0.04);                         // Chão rochoso é bem áspero, reflete pouco
             shininessMat = 6.0;
         } else if (normal.y < -0.8) {
@@ -471,9 +484,11 @@ window.addEventListener("DOMContentLoaded", () => {
     let particleProgram;
     let particleLocations = {};
     let particleSystem = null;
-    let exitFireSystem = null;
+    let exitFireSystems = [];
+    let customWallsMesh = null;
     let hasGoblet = false;
     let isGameOver = false;
+    let playerHealth = 100.0;
     const gobletModelMatrix = Mat4.create();
     const gobletTempMatrix = Mat4.create();
     const gobletRotMatrix = Mat4.create();
@@ -723,8 +738,8 @@ window.addEventListener("DOMContentLoaded", () => {
             gobletMesh = GobletGenerator.generateGobletMesh(gl);
             console.log("Cálice de Fogo criado com sucesso.", gobletMesh);
 
-            // Posicionar o Cálice no centro do labirinto (9.0, 0.0, 9.0)
-            let gobletX = 9.0;
+            // Posicionar o Cálice um pouco mais a leste do centro (X=9.5)
+            let gobletX = 9.5;
             let gobletZ = 9.0;
             if (!isPositionClear(gobletX, gobletZ, 0.5)) {
                 let found = false;
@@ -757,15 +772,66 @@ window.addEventListener("DOMContentLoaded", () => {
             particleSystem.initWebGL(gl, particleProgram);
             console.log("Sistema de Partículas (Chama Azul) inicializado.");
 
-            // Criar Sistema de Partículas (Chama Vermelha de Bloqueio da Saída)
-            exitFireSystem = new ParticleSystem(150);
-            exitFireSystem.initWebGL(gl, particleProgram);
+            // Criar Sistema de Partículas (3 Pilares de Chama Vermelha para bloquear a saída)
+            exitFireSystems = [
+                new ParticleSystem(150, 1.2, 0.99),
+                new ParticleSystem(150, 1.2, 0.99),
+                new ParticleSystem(150, 1.2, 0.99)
+            ];
+            exitFireSystems.forEach(sys => sys.initWebGL(gl, particleProgram));
             console.log("Sistema de Partículas da Saída (Chama Vermelha) inicializado.");
+
+            // Criar malha para as paredes extras intransponíveis (Substituindo o fogo por paredes de tijolos)
+            const wallsData = [
+                { x1: 17.0, z1: 3.5, x2: 25.0, z2: 3.5 },
+                { x1: 17.0, z1: 12.5, x2: 25.0, z2: 12.5 }
+            ];
+            let cwPos = [];
+            let cwNrm = [];
+            const wy1 = 0.024753; // Altura aproximada do labirinto no arquivo obj
+            for (let w of wallsData) {
+                const wx1 = w.x1 / mazeScale;
+                const wz1 = w.z1 / mazeScale;
+                const wx2 = w.x2 / mazeScale;
+                const wz2 = w.z2 / mazeScale;
+                
+                cwPos.push(wx1, 0, wz1,  wx2, 0, wz2,  wx1, wy1, wz1);
+                cwPos.push(wx1, wy1, wz1,  wx2, 0, wz2,  wx2, wy1, wz2);
+                cwNrm.push(0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1);
+                
+                cwPos.push(wx1, 0, wz1,  wx1, wy1, wz1,  wx2, 0, wz2);
+                cwPos.push(wx1, wy1, wz1,  wx2, wy1, wz2,  wx2, 0, wz2);
+                cwNrm.push(0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1);
+            }
+            const cwVAO = gl.createVertexArray();
+            gl.bindVertexArray(cwVAO);
+            
+            const cwPosBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, cwPosBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cwPos), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(locations.aPosition);
+            gl.vertexAttribPointer(locations.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+            const cwNrmBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, cwNrmBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cwNrm), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(locations.aNormal);
+            gl.vertexAttribPointer(locations.aNormal, 3, gl.FLOAT, false, 0, 0);
+            
+            gl.bindVertexArray(null);
+            customWallsMesh = { vao: cwVAO, count: cwPos.length / 3 };
+            console.log("Paredes extras geradas.");
 
             isLoaded = true;
             if (loader) {
                 loader.style.opacity = "0";
-                setTimeout(() => loader.style.display = "none", 800);
+                setTimeout(() => {
+                    loader.style.display = "none";
+                    const startMenu = document.getElementById("startMenuOverlay");
+                    if (startMenu) {
+                        startMenu.style.display = "flex";
+                    }
+                }, 800);
             }
             requestAnimationFrame(gameLoop);
         } catch (err) {
@@ -822,7 +888,18 @@ window.addEventListener("DOMContentLoaded", () => {
         }
         
         wallSegments = new Float32Array(rawSegments);
-        console.log(`Sistema de Colisão: ${wallSegments.length / 4} segmentos de parede extraídos.`);
+        
+        // Adicionar barreiras de colisão para as chamas da entrada (para não dar a volta)
+        const extraWalls = [
+            17.0, 3.5, 25.0, 3.5,
+            17.0, 12.5, 25.0, 12.5
+        ];
+        const newWalls = new Float32Array(wallSegments.length + extraWalls.length);
+        newWalls.set(wallSegments);
+        newWalls.set(extraWalls, wallSegments.length);
+        wallSegments = newWalls;
+
+        console.log(`Sistema de Colisão: ${wallSegments.length / 4} segmentos de parede extraídos/adicionados.`);
         if (wallSegments.length === 0) {
             console.warn("AVISO: Nenhuma parede detectada!");
         }
@@ -1057,8 +1134,38 @@ window.addEventListener("DOMContentLoaded", () => {
         }
 
         // --- Atualizar Sistema de Partículas da Saída (Chama Vermelha de Bloqueio) ---
-        if (exitFireSystem && !hasGoblet) {
-            exitFireSystem.update(dt, [1.0, 0.05, 1.5]);
+        if (exitFireSystems.length > 0 && !hasGoblet) {
+            exitFireSystems[0].update(dt, [1.0, 0.05, 1.5]); // Central
+            exitFireSystems[1].update(dt, [1.0, 0.05, 1.0]); // Lado 1 (Z-0.5)
+            exitFireSystems[2].update(dt, [1.0, 0.05, 2.0]); // Lado 2 (Z+0.5)
+        }
+
+
+
+        // --- Lógica de Sanidade (Vida) ---
+        if (isGameStarted && !isGameOver) {
+            const distToEyeTarget = Math.hypot(cameraPos[0] - eyeTarget[0], cameraPos[2] - eyeTarget[2]);
+            if (distToEyeTarget < 3.5) { // Dentro do raio da luz do vigia
+                playerHealth -= 15.0 * dt; // Drena vida rápido
+                if (playerHealth <= 0) {
+                    playerHealth = 0;
+                    isGameOver = true;
+                    document.exitPointerLock();
+                    const gameOverScreen = document.getElementById("gameOverOverlay");
+                    if (gameOverScreen) gameOverScreen.style.display = "flex";
+                }
+            } else {
+                if (playerHealth < 100.0) {
+                    playerHealth += 5.0 * dt; // Recupera devagar fora da luz
+                    if (playerHealth > 100.0) playerHealth = 100.0;
+                }
+            }
+            
+            // Atualizar barra de vida UI
+            const healthBarFill = document.getElementById("healthBarFill");
+            const healthBarContainer = document.getElementById("healthBarContainer");
+            if (healthBarFill) healthBarFill.style.width = playerHealth + "%";
+            if (healthBarContainer) healthBarContainer.style.display = "block";
         }
 
         document.getElementById("statPos").textContent = `[${cameraPos[0].toFixed(1)}, ${cameraPos[1].toFixed(1)}, ${cameraPos[2].toFixed(1)}]`;
@@ -1151,7 +1258,12 @@ window.addEventListener("DOMContentLoaded", () => {
             else gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
         }
 
-        // --- DESENHAR CHÃO DO LABIRINTO ---
+        // --- DESENHAR PAREDES EXTRAS (Custom Walls) ---
+        if (customWallsMesh) {
+            gl.bindVertexArray(customWallsMesh.vao);
+            gl.drawArrays(gl.TRIANGLES, 0, customWallsMesh.count);
+            gl.bindVertexArray(null);
+        }
         // Usa o mesmo model matrix (mazeScale) que as paredes, para manter escala consistente
         if (floorMesh) {
             gl.bindVertexArray(floorMesh.vao);
@@ -1252,10 +1364,12 @@ window.addEventListener("DOMContentLoaded", () => {
             }
 
             // Chama vermelha da saída (tipo 1) se o cálice não foi pego
-            if (exitFireSystem && !hasGoblet) {
+            if (exitFireSystems.length > 0 && !hasGoblet) {
                 gl.uniform1i(particleLocations.uParticleType, 1);
-                exitFireSystem.draw(gl, particleProgram);
+                exitFireSystems.forEach(sys => sys.draw(gl, particleProgram));
             }
+
+
 
             gl.depthMask(true);
             gl.disable(gl.BLEND);
