@@ -137,7 +137,7 @@ window.addEventListener("DOMContentLoaded", () => {
         );
 
         Vec3.normalize(cameraFront, tempFront);
-        
+
         // Atualiza UI de Rotação
         document.getElementById("statRot").textContent = `${yaw.toFixed(1)}° / ${pitch.toFixed(1)}°`;
     });
@@ -539,7 +539,7 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([100, 100, 100, 255]));
 
         const image = new Image();
-        image.onload = function() {
+        image.onload = function () {
             gl.activeTexture(gl.TEXTURE0); // Garante a unidade 0 para o upload
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
@@ -556,7 +556,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 console.error(`Erro WebGL no onload de ${url}: ${err}`);
             }
         };
-        image.onerror = function() {
+        image.onerror = function () {
             console.error(`Erro ao carregar a textura: ${url}`);
         };
         image.src = url;
@@ -644,8 +644,8 @@ window.addEventListener("DOMContentLoaded", () => {
             ]);
             // prettier-ignore
             const floorNormals = new Float32Array([
-                0, 1, 0,  0, 1, 0,  0, 1, 0,
-                0, 1, 0,  0, 1, 0,  0, 1, 0
+                0, 1, 0, 0, 1, 0, 0, 1, 0,
+                0, 1, 0, 0, 1, 0, 0, 1, 0
             ]);
 
             const floorVAO = gl.createVertexArray();
@@ -794,18 +794,18 @@ window.addEventListener("DOMContentLoaded", () => {
                 const wz1 = w.z1 / mazeScale;
                 const wx2 = w.x2 / mazeScale;
                 const wz2 = w.z2 / mazeScale;
-                
-                cwPos.push(wx1, 0, wz1,  wx2, 0, wz2,  wx1, wy1, wz1);
-                cwPos.push(wx1, wy1, wz1,  wx2, 0, wz2,  wx2, wy1, wz2);
-                cwNrm.push(0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1);
-                
-                cwPos.push(wx1, 0, wz1,  wx1, wy1, wz1,  wx2, 0, wz2);
-                cwPos.push(wx1, wy1, wz1,  wx2, wy1, wz2,  wx2, 0, wz2);
-                cwNrm.push(0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1);
+
+                cwPos.push(wx1, 0, wz1, wx2, 0, wz2, wx1, wy1, wz1);
+                cwPos.push(wx1, wy1, wz1, wx2, 0, wz2, wx2, wy1, wz2);
+                cwNrm.push(0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1);
+
+                cwPos.push(wx1, 0, wz1, wx1, wy1, wz1, wx2, 0, wz2);
+                cwPos.push(wx1, wy1, wz1, wx2, wy1, wz2, wx2, 0, wz2);
+                cwNrm.push(0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1);
             }
             const cwVAO = gl.createVertexArray();
             gl.bindVertexArray(cwVAO);
-            
+
             const cwPosBuf = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, cwPosBuf);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cwPos), gl.STATIC_DRAW);
@@ -817,7 +817,7 @@ window.addEventListener("DOMContentLoaded", () => {
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cwNrm), gl.STATIC_DRAW);
             gl.enableVertexAttribArray(locations.aNormal);
             gl.vertexAttribPointer(locations.aNormal, 3, gl.FLOAT, false, 0, 0);
-            
+
             gl.bindVertexArray(null);
             customWallsMesh = { vao: cwVAO, count: cwPos.length / 3 };
             console.log("Paredes extras geradas.");
@@ -850,12 +850,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
             if (ind) {
                 for (let i = 0; i < ind.length; i += 3) {
-                    const i1 = ind[i] * 3, i2 = ind[i+1] * 3, i3 = ind[i+2] * 3;
-                    processTriangle(pos[i1], pos[i1+1], pos[i1+2], pos[i2], pos[i2+1], pos[i2+2], pos[i3], pos[i3+1], pos[i3+2]);
+                    const i1 = ind[i] * 3, i2 = ind[i + 1] * 3, i3 = ind[i + 2] * 3;
+                    processTriangle(pos[i1], pos[i1 + 1], pos[i1 + 2], pos[i2], pos[i2 + 1], pos[i2 + 2], pos[i3], pos[i3 + 1], pos[i3 + 2]);
                 }
             } else {
                 for (let i = 0; i < pos.length; i += 9) {
-                    processTriangle(pos[i], pos[i+1], pos[i+2], pos[i+3], pos[i+4], pos[i+5], pos[i+6], pos[i+7], pos[i+8]);
+                    processTriangle(pos[i], pos[i + 1], pos[i + 2], pos[i + 3], pos[i + 4], pos[i + 5], pos[i + 6], pos[i + 7], pos[i + 8]);
                 }
             }
         }
@@ -865,8 +865,8 @@ window.addEventListener("DOMContentLoaded", () => {
             const x2 = Math.round(p2[0] * 100), z2 = Math.round(p2[1] * 100);
             if (x1 === x2 && z1 === z2) return;
 
-            const key = x1 < x2 || (x1 === x2 && z1 < z2) 
-                ? `${x1},${z1}|${x2},${z2}` 
+            const key = x1 < x2 || (x1 === x2 && z1 < z2)
+                ? `${x1},${z1}|${x2},${z2}`
                 : `${x2},${z2}|${x1},${z1}`;
 
             if (!segmentSet.has(key)) {
@@ -886,9 +886,9 @@ window.addEventListener("DOMContentLoaded", () => {
                 addUniqueSegment([x3 * mazeScale, z3 * mazeScale], [x1 * mazeScale, z1 * mazeScale]);
             }
         }
-        
+
         wallSegments = new Float32Array(rawSegments);
-        
+
         // Adicionar barreiras de colisão para as chamas da entrada (para não dar a volta)
         const extraWalls = [
             17.0, 3.5, 25.0, 3.5,
@@ -911,14 +911,14 @@ window.addEventListener("DOMContentLoaded", () => {
         const l2 = dx * dx + dz * dz;
         // Se o segmento é um ponto, retorna distância ao ponto
         if (l2 < 0.0001) return (px - x1) ** 2 + (pz - z1) ** 2;
-        
+
         // Projeção do ponto no segmento
         let t = ((px - x1) * dx + (pz - z1) * dz) / l2;
         t = Math.max(0, Math.min(1, t));
-        
+
         const closestX = x1 + t * dx;
         const closestZ = z1 + t * dz;
-        
+
         return (px - closestX) ** 2 + (pz - closestZ) ** 2;
     }
 
@@ -931,10 +931,10 @@ window.addEventListener("DOMContentLoaded", () => {
                 return true;
             }
         }
-        const radius = 0.2; 
+        const radius = 0.2;
         const radiusSq = radius * radius;
         for (let i = 0; i < wallSegments.length; i += 4) {
-            if (distToSegmentSq(nx, nz, wallSegments[i], wallSegments[i+1], wallSegments[i+2], wallSegments[i+3]) < radiusSq) {
+            if (distToSegmentSq(nx, nz, wallSegments[i], wallSegments[i + 1], wallSegments[i + 2], wallSegments[i + 3]) < radiusSq) {
                 return true;
             }
         }
@@ -1058,7 +1058,7 @@ window.addEventListener("DOMContentLoaded", () => {
             if (dist < 0.8) {
                 hasGoblet = true;
                 console.log("Cálice de Fogo coletado!");
-                showToast("CÁLICE DE FOGO COLETADO", "A chama da saída foi extinta. O Olho de Jade ficou furioso! Corra para a saída em [1.0, 1.5]!");
+                showToast("CÁLICE DE FOGO COLETADO", "A chama da saída foi extinta. O Olho de Jade ficou furioso! Corra para a saída!");
             }
         } else {
             // Se coletou o cálice, verifica se chegou à saída (1.0, 1.5) para vencer
@@ -1114,7 +1114,7 @@ window.addEventListener("DOMContentLoaded", () => {
             eyeTargetWaypoint[2] = 3.0 + Math.random() * (mazeScale * 0.3 - 6.0);
             eyeWaypointTimer = 0.0;
         }
-        
+
         // Interpola suavemente a posição do feixe (fator de interpolação aumentado se o cálice for coletado)
         const jadeEyeSpeedFactor = hasGoblet ? 1.5 : 0.4;
         eyeTarget[0] += (eyeTargetWaypoint[0] - eyeTarget[0]) * dt * jadeEyeSpeedFactor;
@@ -1160,7 +1160,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     if (playerHealth > 100.0) playerHealth = 100.0;
                 }
             }
-            
+
             // Atualizar barra de vida UI
             const healthBarFill = document.getElementById("healthBarFill");
             const healthBarContainer = document.getElementById("healthBarContainer");
@@ -1206,11 +1206,11 @@ window.addEventListener("DOMContentLoaded", () => {
         gl.uniformMatrix4fv(locations.uProjectionMatrix, false, projMatrix);
         gl.uniformMatrix4fv(locations.uViewMatrix, false, viewMatrix);
         gl.uniformMatrix4fv(locations.uModelMatrix, false, modelMatrix);
-        
+
         // Dados da Câmera
         gl.uniform3fv(locations.uCameraPos, activeCameraPos);
         gl.uniform3fv(locations.uCameraFront, cameraFront);
-        
+
         // Luz 1: Lanterna do Jogador (Branca/Amarelada)
         const light1Color = isLightOn ? [1.0, 0.95, 0.85] : [0.0, 0.0, 0.0];
         gl.uniform3fv(locations.uLight1Color, light1Color);
@@ -1278,15 +1278,15 @@ window.addEventListener("DOMContentLoaded", () => {
         coneCoords[0] = eyePos[0];
         coneCoords[1] = eyePos[1];
         coneCoords[2] = eyePos[2];
-        
+
         // Círculo base no chão (raio do feixe)
         const coneRadius = 3.0; // Raio da cônica ajustado para 3.0 unidades para bater com spotCutoff2 = 0.93
         for (let i = 0; i <= N; i++) {
             const angle = (i % N) * 2 * Math.PI / N;
             const idx = (i + 1) * 3;
             coneCoords[idx] = eyeTarget[0] + Math.cos(angle) * coneRadius;
-            coneCoords[idx+1] = 0.05; // Levemente acima do chão (Y=0) para evitar z-fighting
-            coneCoords[idx+2] = eyeTarget[2] + Math.sin(angle) * coneRadius;
+            coneCoords[idx + 1] = 0.05; // Levemente acima do chão (Y=0) para evitar z-fighting
+            coneCoords[idx + 2] = eyeTarget[2] + Math.sin(angle) * coneRadius;
         }
 
         // Upload dinâmico dos vértices do cone
@@ -1420,12 +1420,12 @@ window.addEventListener("DOMContentLoaded", () => {
     function triggerWin() {
         if (isGameOver) return;
         isGameOver = true;
-        
+
         // Parar o mouse / release pointer lock
         if (document.pointerLockElement === canvas) {
             document.exitPointerLock();
         }
-        
+
         // Exibir tela de vitória
         const winOverlay = document.getElementById("winOverlay");
         if (winOverlay) {
