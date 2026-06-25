@@ -22,14 +22,14 @@ O jogador explora um labirinto escuro sob a vigilância constante do **Olho de J
 
 1.  **O Olho de Jade (Vigia Celestial):**
     *   Uma fonte de luz móvel verde paira sobre o centro do labirinto ($Y = 8.0$), projetando um feixe cônico volumétrico dinâmico que varre o chão em busca de intrusos.
-    *   Caso o jogador entre sob a luz do feixe, sua **Sanidade** (barra de vida na parte inferior) diminui rapidamente ($15\%$ por segundo). Se a sanidade for drenada por completo, ocorre o **Fim de Jogo**.
-    *   Fora do alcance do feixe, o jogador recupera sua sanidade lentamente ($5\%$ por segundo).
+    *   Caso o jogador entre sob a luz do feixe, sua **Sanidade** (barra de vida na parte inferior) diminui rapidamente. Se a sanidade for drenada por completo, ocorre o **Fim de Jogo**.
+    *   Fora do alcance do feixe, o jogador recupera sua sanidade lentamente.
 2.  **O Cálice de Fogo:**
     *   Um item sagrado que repousa em uma posição segura e aleatória do mapa.
     *   O cálice brilha com uma chama mística azul e gera iluminação point light dinâmica própria.
     *   Ao coletá-lo, o jogador extingue as labaredas de fogo que bloqueavam a saída. No entanto, o **Olho de Jade fica furioso**: o feixe de luz torna-se vermelho e passa a perseguir o jogador a uma velocidade muito maior!
 3.  **Fuga e Vitória:**
-    *   Com o Cálice coletado, o jogador deve se mover rapidamente até o local de fuga (coordenada `(1.0, 1.5)`) para vencer a partida.
+    *   Com o Cálice coletado, o jogador deve se mover rapidamente até o local de fuga para vencer a partida.
 4.  **Lanterna do Jogador:**
     *   Uma luz direcional portátil controlada pelo jogador para ajudá-lo a enxergar nos cantos mais escuros do labirinto.
 
@@ -94,7 +94,7 @@ Abra seu navegador de preferência e acesse o endereço correspondente:
 
 ## 🎥 Demonstração em Vídeo
 
-[Link para o vídeo demonstrando a execução do programa será adicionado aqui em breve]
+Assista à demonstração de gameplay no YouTube: [O Labirinto de Jade - Gameplay](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
 
 ---
 
