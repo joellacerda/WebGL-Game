@@ -1,124 +1,80 @@
-# WebGL 3D Engine - Boilerplate & CSS UI Toolbox
+# WebGL 3D Game - O Labirinto de Jade
 
-Este é um **Boilerplate e Motor de Renderização 3D de alta performance desenvolvido em WebGL 2.0 puro** (HTML5 + Javascript), livre de dependências externas ou bibliotecas gráficas de alto nível (como Three.js ou Babylon.js). 
+## Descrição do Jogo
 
-O projeto foi projetado com foco em **Visual Excellence** e fornece toda a infraestrutura de hardware, álgebra de matrizes manuais, câmera 3D em primeira pessoa com trava física de cursor (**Pointer Lock API**) e uma **Caixa de Ferramentas CSS Temática** rica e modular voltada para a criação de jogos de suspense, labirintos e *Escape Rooms*.
+Este é um jogo de exploração 3D em primeira pessoa (estilo FPS) desenvolvido inteiramente com WebGL 2.0 puro (HTML5 + Javascript). O objetivo do jogador é navegar por um labirinto escuro utilizando uma lanterna até encontrar o Cálice de Fogo iluminado. Além do ambiente envolvente, o jogo apresenta um "Olho de Jade" que varre o cenário com uma luz móvel autônoma. 
 
----
+O projeto foi construído do zero, sem o uso de bibliotecas gráficas de alto nível (como Three.js ou Babylon.js), implementando toda a matemática vetorial e de matrizes manualmente para máxima performance e entendimento do pipeline gráfico clássico.
 
-## 📂 Estrutura do Projeto
+## Tutorial de Compilação e Execução
 
-```
-WebGL Game/
-├── README.md               # Este arquivo com instruções de execução
-├── index.html              # HUD de telemetria, Canvas WebGL e filtros visuais
-├── style.css               # Caixa de ferramentas CSS (Painéis, Inventário, Teclados, Animações)
-├── math3d.js               # Biblioteca matemática de Álgebra Linear manual
-├── obj-parser.js           # Leitor e Parser assíncrono de arquivos .obj 3D
-├── game.js                 # Motor gráfico: WebGL 2.0 setup, controles e loop principal
-└── assets/                 # Pasta de recursos (Coloque seus modelos OBJ e texturas PNG aqui)
-```
-
----
-
-## 🛠️ Pré-requisitos
-
-Para rodar este boilerplate localmente, você precisa apenas de:
-1.  **Navegador Web Moderno** (Chrome, Firefox, Edge, Safari ou Brave) com suporte a WebGL 2.0.
-2.  **Um utilitário de Servidor HTTP local básico** (como Python 3 ou Node.js). 
-    > [!IMPORTANT]
-    > **Por que é necessário um servidor local?** O navegador restringe requisições de arquivos locais (como carregar modelos `.obj` de forma assíncrona) via protocolo `file://` direto por motivos de segurança (CORS). Rodar um servidor local resolve essa restrição.
-
----
-
-## 🏃 Como Baixar e Executar o Projeto
+Para rodar este jogo localmente, você precisa de um navegador moderno com suporte a WebGL 2.0 e um servidor HTTP local simples (para evitar problemas de CORS ao carregar as texturas e modelos 3D).
 
 ### Passo 1: Obter os Arquivos
-Certifique-se de que a pasta contendo a estrutura acima esteja salva no seu computador (por exemplo, no diretório `/Users/joellacerda/Desktop/WebGL Game/`).
+Clone ou baixe a versão mais recente deste repositório para o seu computador.
 
 ### Passo 2: Iniciar o Servidor Local
-Abra o seu terminal, navegue até a pasta do projeto e execute um dos comandos abaixo:
+Abra o seu terminal (Prompt de Comando, PowerShell ou Terminal do Linux/Mac), navegue até a pasta do projeto e execute um dos comandos abaixo:
 
-#### Opção A: Servidor Nativo do Python 3 (Recomendado)
-Se você tem o Python 3 instalado no computador (padrão em sistemas macOS e Linux):
+**Com Python (Recomendado):**
 ```bash
-python3 -m http.server 8000
+python -m http.server 8000
 ```
+*(Em alguns sistemas Mac/Linux, o comando pode ser `python3 -m http.server 8000`)*
 
-#### Opção B: Servidor Node.js / npm
-Se você possui o Node.js instalado em sua máquina:
+**Com Node.js (npx):**
 ```bash
-npx serve .
-# ou
-npx http-server .
+npx http-server
 ```
 
-### Passo 3: Abrir no Navegador
-Uma vez iniciado o servidor, abra seu navegador de preferência e acesse o endereço correspondente:
-*   Para o servidor Python: [http://localhost:8000](http://localhost:8000)
-*   Para o servidor Node (serve): [http://localhost:3000](http://localhost:3000)
+### Passo 3: Jogar!
+Abra seu navegador de preferência e acesse o endereço gerado:
+* Se usou Python: [http://localhost:8000](http://localhost:8000)
+* Se usou Node.js: Verifique no terminal, geralmente é [http://127.0.0.1:8080](http://127.0.0.1:8080)
+
+Para jogar, **clique em qualquer lugar da tela** para travar o cursor do mouse e use o mouse para olhar ao redor. Use as teclas **W, A, S, D** para caminhar pelo labirinto! Para soltar o mouse, aperte a tecla **ESC**.
 
 ---
 
-## 🎮 Controles Padrão (Câmera FPS)
+## Demonstração em Vídeo
 
-*   **Clique Esquerdo no Canvas:** Trava o cursor do mouse na tela para controle livre em 3D.
-*   **Movimento do Mouse:** Rotaciona a cabeça da câmera livremente em 360° (olhar horizontal e vertical).
-*   **Teclas W, A, S, D:** Anda pelo cenário no plano horizontal (bloqueado para não flutuar).
-*   **Tecla L ou Botão Verde "L" no HUD:** Alterna o estado lógico da iluminação (registrado em tempo real no console do desenvolvedor).
-*   **Tecla ESC:** Libera o cursor do mouse da tela.
+[Link para o vídeo demonstrando a execução do programa será adicionado aqui em breve]
 
 ---
 
-## 📐 Ferramentas e Recursos Prontos para Uso
+## Detalhamento das Especificações
 
-### 1. Biblioteca Gráfica e Matemática (`math3d.js`)
-Implementada de forma puramente manual no CPU, contendo:
-*   `Mat4.perspective(fov, aspect, near, far)`: Matriz de projeção perspectiva manual.
-*   `Mat4.lookAt(eye, center, up)`: Matriz de visualização em primeira pessoa.
-*   `Mat4.translation(x, y, z)`, `Mat4.scale(x, y, z)`, `Mat4.rotation[X/Y/Z](angulo)`: Transformações de modelo tridimensionais.
-*   `Vec3.cross(a, b)`, `Vec3.normalize(v)`, `Vec3.dot(a, b)`: Operações estruturadas de vetores 3D.
+### Requisitos Gerais
 
-### 2. Custom OBJ Parser (`obj-parser.js`)
-Lê e analisa dados brutos de strings `.obj` extraindo vértices (`v`), coordenadas UV (`vt`) e normais (`vn`). Triangula automaticamente faces poligonais complexas usando **Fan Triangulation** e monta Float32Arrays paralelos ideais para envio aos buffers do WebGL.
+✅ **I) Movimentação de câmera com projeção perspectiva:**
+Utilizamos a função `Mat4.perspective` para a projeção 3D e uma câmera livre em primeira pessoa (tipo FPS). O mouse rotaciona a visão calculando *yaw* e *pitch*, e as teclas WASD movem o jogador pelo ambiente usando álgebra vetorial (`frontProj` e `rightVec`).
 
-### 3. Telemetria em Tempo Real (HUD)
-O painel no canto superior esquerdo exibe dados de hardware e física calculados em tempo real:
-*   **Posição da Câmera:** Exibe `[X, Y, Z]` com precisão de duas casas decimais.
-*   **Ângulos de Olhar:** Mostra a rotação em graus para os eixos `Yaw` e `Pitch`.
-*   **Frames por Segundo (FPS):** Medidor dinâmico de performance da GPU/CPU.
+✅ **II) Sistema de iluminação (Phong) com luz móvel:**
+Os shaders no `game.js` usam o **Modelo de Reflexão de Phong** de forma explícita (há até um comentário no código "MODELO DE REFLEXÃO DE PHONG COMPLETO"). Calculamos a luz ambiente, difusa (via `dot(normal, lightDir)`) e especular (via `reflect` e `pow(max(dot(viewDir, reflectDir), 0.0), shininessMat)`).
+Temos fontes de luz que se movem o tempo todo: a Lanterna (que acompanha a posição/rotação da sua câmera) e o Olho de Jade (que se desloca autonomamente varrendo o chão).
 
-### 4. Caixa de Ferramentas de Estilização CSS (`style.css`)
-Contém classes modulares prontas para interfaces de labirintos e jogos de escape room:
-*   **Vinhetas Cinemáticas:** Vinheta de suspense escura (`.vignette-suspense`) e vinheta de pânico pulsante vermelha (`.vignette-alert`).
-*   **Inventário Visual:** Grade de slots de itens (`.inventory-grid` e `.item-slot`) para chaves e itens coletados, com suporte para slots selecionados (`.active`) ou vazios (`.empty`).
-*   **Teclado Numérico (`.keypad-grid`):** Interface para telas de inputs de código de cadeado ou cofre.
-*   **Barras de Progresso HUD (`.hud-progress-bar`):** Barras estilizadas neon de Sanidade/Vida (`.progress-green`), Alerta (`.progress-red`) e Lanterna/Estamina (`.progress-cyan`).
-*   **Animações Dinâmicas:** Efeito piscante de lâmpada falhando (`.flicker`) e tremor digital crt (`.crt-glitch`).
+✅ **III) Objeto animado por transformações geométricas:**
+O **Cálice de Fogo**. No loop de renderização (função `render()`), aplicamos `Mat4.translate` para fazê-lo flutuar usando um `Math.sin(gameTime)` e `Mat4.rotateY` para ele girar em torno do próprio eixo continuamente, multiplicando tudo em sua matriz de modelo original (`gobletModelMatrix`).
 
----
+✅ **IV) Objeto com textura:**
+As paredes do labirinto possuem texturas de tijolos (`wallAlbedoTexture`) usando coordenadas de mapa, e o chão possui a textura de terreno rochoso (`groundAlbedoTexture`).
 
-## 🎨 Como Desenhar Seus Próprios Objetos
+✅ **V) Objeto com cor sólida:**
+O próprio Cálice de Fogo não possui uma imagem de textura atrelada, mas sim uma cor sólida dourada (`vec3(0.8, 0.7, 0.1)`) calculada matematicamente dentro do shader (`gobletFSSource`), que interage perfeitamente com a iluminação especular do Phong.
 
-Para renderizar seus modelos no loop, edite o final da função `render(time)` no arquivo `game.js`:
+### Requisitos Específicos do Jogo 3D
 
-```javascript
-gl.useProgram(seuProgramaDeShader);
+✅ **I) Tipo de câmera livre:** 
+Implementamos uma câmera em primeira pessoa utilizando a **Pointer Lock API** do HTML5.
 
-// 1. Defina a posição e a transformação
-let modelMatrix = Mat4.translation(0.0, 1.0, 0.0);
-modelMatrix = Mat4.multiply(modelMatrix, Mat4.rotationY(time)); // rotaciona a malha
+✅ **II e III) Objetos de arquivos OBJ e Leitor Próprio:**
+Carregamos o `assets/labyrinth.obj`. Mais importante ainda: **não usamos** nenhuma biblioteca pronta para isso. O script `obj-parser.js` foi criado do zero para ler o texto do OBJ, fazer o parse dos vértices e normais e passar para o buffer do WebGL.
 
-// 2. Envie as matrizes
-gl.uniformMatrix4fv(locationProj, false, projectionMatrix);
-gl.uniformMatrix4fv(locationView, false, viewMatrix);
-gl.uniformMatrix4fv(locationModel, false, modelMatrix);
+✅ **IV e V) Modelos e Autoria:**
+Utilizamos um modelo de labirinto externo.
 
-// 3. Vincule os buffers do seu objeto 3D
-gl.bindBuffer(gl.ARRAY_BUFFER, seuBufferDePosicoes);
-gl.vertexAttribPointer(attribPos, 3, gl.FLOAT, false, 0, 0);
-gl.enableVertexAttribArray(attribPos);
+✅ **VI e VII) OpenGL/WebGL puros e Canvas HTML5:**
+O jogo é desenhado puramente com a chamada `canvas.getContext("webgl2")`. Não estamos usando Three.js, Babylon.js ou similares, apenas chamadas puras da API gráfica.
 
-// 4. Desenhe!
-gl.drawArrays(gl.TRIANGLES, 0, totalDeVertices);
-```
+✅ **VI Auxiliares) Bibliotecas de Álgebra / Eventos:**
+Temos nosso próprio script `math3d.js` para manipulação segura das Matrizes 4x4 e Vetores de 3 posições. A leitura do teclado (`keydown`, `keyup`) e mouse (`mousemove`) é feita organicamente com JavaScript (Event Listeners puros) sem nenhuma lib externa invadindo as lógicas do motor gráfico.
