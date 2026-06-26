@@ -97,13 +97,6 @@ Abra seu navegador de preferência e acesse o endereço correspondente:
 
 ---
 
-## 🎥 Demonstração e Apresentação
-
-*   **Demonstração de Gameplay (YouTube):** [O Labirinto de Jade - Gameplay](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
-*   **Apresentação do Projeto (Google Slides):** [Slides da Apresentação](https://docs.google.com/presentation/d/1iUTurrpr7BFoZZRj1x0SkkXYSI1sh59MqavfmHCrp2I/edit?usp=sharing)
-
----
-
 ## 📋 Requisitos do Projeto
 
 **Requisitos Gerais**
