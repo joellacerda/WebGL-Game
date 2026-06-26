@@ -1,5 +1,10 @@
 # 🟢 O Labirinto de Jade — Motor Gráfico 3D WebGL 2.0
 
+*   🎥 **Vídeo de Demonstração:** [Assista no YouTube](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
+*   📊 **Apresentação do Projeto:** [Slides da Apresentação](https://docs.google.com/presentation/d/1iUTurrpr7BFoZZRj1x0SkkXYSI1sh59MqavfmHCrp2I/edit?usp=sharing)
+
+---
+
 Este projeto é um jogo de suspense e escape em primeira pessoa desenvolvido em **WebGL 2.0 puro** (HTML5 + vanilla JavaScript), livre de dependências externas ou bibliotecas gráficas de alto nível (como *Three.js* ou *Babylon.js*). 
 
 O jogador explora um labirinto escuro sob a vigilância constante do **Olho de Jade**, um feixe de luz verde que varre o solo. O objetivo é recuperar o **Cálice de Fogo Azul** para extinguir a barreira de chamas da saída e escapar.
@@ -8,13 +13,13 @@ O jogador explora um labirinto escuro sob a vigilância constante do **Olho de J
 
 ## 📂 Estrutura do Projeto
 
-*   [index.html](file:///Users/joellacerda/Desktop/WebGL%20Game/index.html) — HUD de telemetria, Canvas WebGL, vinhetas cinemáticas, tela de menu, fim de jogo e vitória.
-*   [game.js](file:///Users/joellacerda/Desktop/WebGL%20Game/game.js) — O motor do jogo: inicialização do contexto WebGL 2.0, shaders principais, física de colisão, inteligência artificial do vigia e loop de renderização.
-*   [math3d.js](file:///Users/joellacerda/Desktop/WebGL%20Game/math3d.js) — Biblioteca matemática própria contendo operações estruturadas de vetores ([Vec3](file:///Users/joellacerda/Desktop/WebGL%20Game/math3d.js#L8)) e matrizes ([Mat4](file:///Users/joellacerda/Desktop/WebGL%20Game/math3d.js#L60)).
-*   [obj-parser.js](file:///Users/joellacerda/Desktop/WebGL%20Game/obj-parser.js) — Parser assíncrono customizado para carregar e analisar geometrias 3D de arquivos `.obj`.
-*   [goblet-generator.js](file:///Users/joellacerda/Desktop/WebGL%20Game/goblet-generator.js) — Modeler procedural responsável por criar o modelo 3D do Cálice de Fogo em tempo de execução.
-*   [style.css](file:///Users/joellacerda/Desktop/WebGL%20Game/style.css) — Interface HUD estilizada com vinhetas dinâmicas, glassmorphism, barras de progresso neon e animações de interferência CRT.
-*   **[assets/](file:///Users/joellacerda/Desktop/WebGL%20Game/assets/)** — Recursos de mídia do jogo (modelo 3D do labirinto e texturas de alta resolução).
+*   [index.html](./index.html) — HUD de telemetria, Canvas WebGL, vinhetas cinemáticas, tela de menu, fim de jogo e vitória.
+*   [game.js](./game.js) — O motor do jogo: inicialização do contexto WebGL 2.0, shaders principais, física de colisão, inteligência artificial do vigia e loop de renderização.
+*   [math3d.js](./math3d.js) — Biblioteca matemática própria contendo operações estruturadas de vetores ([Vec3](./math3d.js#L8)) e matrizes ([Mat4](./math3d.js#L60)).
+*   [obj-parser.js](./obj-parser.js) — Parser assíncrono customizado para carregar e analisar geometrias 3D de arquivos `.obj`.
+*   [goblet-generator.js](./goblet-generator.js) — Modeler procedural responsável por criar o modelo 3D do Cálice de Fogo em tempo de execução.
+*   [style.css](./style.css) — Interface HUD estilizada com vinhetas dinâmicas, glassmorphism, barras de progresso neon e animações de interferência CRT.
+*   **[assets/](./assets/)** — Recursos de mídia do jogo (modelo 3D do labirinto e texturas de alta resolução).
 
 ---
 
@@ -38,13 +43,13 @@ O jogador explora um labirinto escuro sob a vigilância constante do **Olho de J
 ## 📐 Funcionalidades Gráficas e WebGL
 
 ### 1. Sistema de Iluminação Phong Multiponto
-Implementação completa do **Modelo de Reflexão de Phong** no pixel shader principal do arquivo [game.js](file:///Users/joellacerda/Desktop/WebGL%20Game/game.js#L163) que integra três fontes de iluminação ativas de forma simultânea:
+Implementação completa do **Modelo de Reflexão de Phong** no pixel shader principal do arquivo [game.js](./game.js#L163) que integra três fontes de iluminação ativas de forma simultânea:
 *   **Luz 1 (Lanterna):** Spotlight acoplada à câmera do jogador (branca/amarelada) com atenuação quadrática de distância e corte suave do cone de luz.
 *   **Luz 2 (Olho de Jade):** Spotlight móvel no topo (verde ou vermelha) com projeção cônica no solo e renderização de feixe volumétrico translúcido (via `TRIANGLE_FAN` dinâmico).
 *   **Luz 3 (Chama do Cálice):** Point light pontual azul e oscilante centralizada no Cálice de Fogo, iluminando paredes e chão ao redor.
 
 ### 2. Modelagem Procedural de Geometria
-O script [goblet-generator.js](file:///Users/joellacerda/Desktop/WebGL%20Game/goblet-generator.js) calcula matematicamente as posições e normais do Cálice de Fogo utilizando superfícies de revolução trigonométricas baseadas no eixo Y. Ele gera os buffers de vértices na CPU e os envia ao WebGL em tempo de execução. O material é sombreado por um shader metálico dourado com gradiente vertical e efeito Fresnel.
+O script [goblet-generator.js](./goblet-generator.js) calcula matematicamente as posições e normais do Cálice de Fogo utilizando superfícies de revolução trigonométricas baseadas no eixo Y. Ele gera os buffers de vértices na CPU e os envia ao WebGL em tempo de execução. O material é sombreado por um shader metálico dourado com gradiente vertical e efeito Fresnel.
 
 ### 3. Sistema de Partículas WebGL
 Dois emissores de partículas independentes controlados via shader de partículas:
@@ -52,7 +57,7 @@ Dois emissores de partículas independentes controlados via shader de partícula
 *   **Partículas Vermelhas:** Três colunas de chamas persistentes que bloqueiam a saída (extintas ao coletar o cálice).
 
 ### 4. Texturização Dinâmica por Mapeamento Planar (Planar UV Mapping)
-Para evitar distorções nas coordenadas de textura de arquivos `.obj` complexos, o shader projeta as texturas de parede ([plaster_brick_01_diff_1k.jpg](file:///Users/joellacerda/Desktop/WebGL%20Game/assets/plaster_brick_01_diff_1k.jpg)) e chão ([rocky_terrain_diff_1k.jpg](file:///Users/joellacerda/Desktop/WebGL%20Game/assets/rocky_terrain_diff_1k.jpg)) baseando-se no vetor normal em tempo real no pixel shader. Isso garante texturas esticadas e mapeadas de forma perfeitamente perpendicular nas superfícies do mundo.
+Para evitar distorções nas coordenadas de textura de arquivos `.obj` complexos, o shader projeta as texturas de parede ([plaster_brick_01_diff_1k.jpg](./assets/plaster_brick_01_diff_1k.jpg)) e chão ([rocky_terrain_diff_1k.jpg](./assets/rocky_terrain_diff_1k.jpg)) baseando-se no vetor normal em tempo real no pixel shader. Isso garante texturas esticadas e mapeadas de forma perfeitamente perpendicular nas superfícies do mundo.
 
 ---
 
@@ -92,9 +97,10 @@ Abra seu navegador de preferência e acesse o endereço correspondente:
 
 ---
 
-## 🎥 Demonstração em Vídeo
+## 🎥 Demonstração e Apresentação
 
-Assista à demonstração de gameplay no YouTube: [O Labirinto de Jade - Gameplay](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
+*   **Demonstração de Gameplay (YouTube):** [O Labirinto de Jade - Gameplay](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
+*   **Apresentação do Projeto (Google Slides):** [Slides da Apresentação](https://docs.google.com/presentation/d/1iUTurrpr7BFoZZRj1x0SkkXYSI1sh59MqavfmHCrp2I/edit?usp=sharing)
 
 ---
 
