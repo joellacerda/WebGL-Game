@@ -1,5 +1,6 @@
 # 🟢 O Labirinto de Jade — Motor Gráfico 3D WebGL 2.0
 
+*   👥 **Membros:** Joel Lacerda, Murilo Melo, Marcus Vinícius
 *   🎥 **Vídeo de Demonstração:** [Assista no YouTube](https://www.youtube.com/watch?v=Yx0AAZdFzMs)
 *   📊 **Apresentação do Projeto:** [Slides da Apresentação](https://docs.google.com/presentation/d/1iUTurrpr7BFoZZRj1x0SkkXYSI1sh59MqavfmHCrp2I/edit?usp=sharing)
 
